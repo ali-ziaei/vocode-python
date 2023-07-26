@@ -346,7 +346,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.logger.debug("Message sent: {}".format(message_sent))
                 if cut_off:
                     self.conversation.agent.update_last_bot_message_on_cut_off(
-                        message_sent
+                        message_sent, conversation_id=self.conversation.id
                     )
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (

@@ -305,7 +305,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.logger.debug("Message sent: {}".format(message_sent))
                 if cut_off:
                     self.conversation.agent.update_last_bot_message_on_cut_off(
-                        message_sent
+                        message_sent, conversation_id=self.conversation.id
                     )
                     self.conversation.transcript.update_last_bot_message_on_cut_off(
                         message_sent

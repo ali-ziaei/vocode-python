@@ -102,7 +102,7 @@ class AbstractAgent(Generic[AgentConfigType]):
     def get_agent_config(self) -> AgentConfig:
         return self.agent_config
 
-    def update_last_bot_message_on_cut_off(self, message: str):
+    def update_last_bot_message_on_cut_off(self, message: str, conversation_id: str):
         """Updates the last bot message in the conversation history when the human cuts off the bot's response."""
         pass
 

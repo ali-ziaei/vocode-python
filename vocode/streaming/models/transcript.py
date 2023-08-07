@@ -167,7 +167,7 @@ class Transcript(BaseModel):
                 )
             )
 
-    def update_last_bot_message_on_cut_off(self, text: str):
+    async def update_last_bot_message_on_cut_off(self, text: str):
         # TODO: figure out what to do for the event
         for event_log in reversed(self.event_logs):
             if isinstance(event_log, Message) and event_log.sender == Sender.BOT:

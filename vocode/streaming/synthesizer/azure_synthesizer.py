@@ -1,4 +1,5 @@
 import asyncio
+from cachetools import LRUCache
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
@@ -67,6 +68,7 @@ class AzureSynthesizer(BaseSynthesizer[AzureSynthesizerConfig]):
     ):
         super().__init__(synthesizer_config, aiohttp_session)
         # Instantiates a client
+        self.cache = AzureSSMLCacheManager().cache
         azure_speech_key = azure_speech_key or getenv("AZURE_SPEECH_KEY")
         azure_speech_region = azure_speech_region or getenv("AZURE_SPEECH_REGION")
         if not azure_speech_key:
@@ -201,8 +203,11 @@ class AzureSynthesizer(BaseSynthesizer[AzureSynthesizerConfig]):
         return ElementTree.tostring(ssml_root, encoding="unicode")
 
     def synthesize_ssml(self, ssml: str) -> speechsdk.AudioDataStream:
-        result = self.synthesizer.start_speaking_ssml_async(ssml).get()
-        return speechsdk.AudioDataStream(result)
+        if not ssml in self.cache:
+            self.logger.debug("Synthesizing SSML - SSML not found in cache")
+            self.cache[ssml] = self.synthesizer.start_speaking_ssml_async(ssml).get()
+
+        return speechsdk.AudioDataStream(self.cache[ssml])
 
     def ready_synthesizer(self):
         connection = speechsdk.Connection.from_speech_synthesizer(self.synthesizer)
@@ -294,3 +299,11 @@ class AzureSynthesizer(BaseSynthesizer[AzureSynthesizerConfig]):
                 message.text, ssml, seconds, word_boundary_event_pool
             ),
         )
+
+class AzureSSMLCacheManager:
+    _instance = None
+    def __new__(c):
+        if c._instance is None:
+            c._instance = super().__new__(c)
+            c._instance.cache = LRUCache(maxsize=500)
+        return c._instance

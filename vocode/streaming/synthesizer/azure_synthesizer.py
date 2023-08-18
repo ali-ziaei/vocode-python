@@ -305,5 +305,5 @@ class AzureSSMLCacheManager:
     def __new__(c):
         if c._instance is None:
             c._instance = super().__new__(c)
-            c._instance.cache = LRUCache(maxsize=500)
+            c._instance.cache = LRUCache(maxsize=2048)
         return c._instance

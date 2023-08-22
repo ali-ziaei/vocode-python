@@ -48,12 +48,14 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         self.optimize_streaming_latency = synthesizer_config.optimize_streaming_latency
         self.words_per_minute = 150
         self.experimental_streaming = synthesizer_config.experimental_streaming
+        self.logger = logger or logging.getLogger(__name__)
 
     async def experimental_streaming_output_generator(
         self,
         response: aiohttp.ClientResponse,
         chunk_size: int,
         create_speech_span: Optional[Span],
+        message: BaseMessage,
     ) -> AsyncGenerator[SynthesisResult.ChunkResult, None]:
         miniaudio_worker_input_queue: asyncio.Queue[
             Union[bytes, None]
@@ -78,17 +80,23 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
         try:
             asyncio.create_task(send_chunks())
-
+            mp3_audio = b''
             # Await the output queue of the MiniaudioWorker and yield the wav chunks in another loop
             while True:
-                # Get the wav chunk and the flag from the output queue of the MiniaudioWorker
-                wav_chunk, is_last = await miniaudio_worker.output_queue.get()
+                # Get the mp3 chunk and the flag from the output queue of the MiniaudioWorker
+                chunk, is_last = await miniaudio_worker.output_queue.get()
+                
+                # We collect the mp3 prior to wav conversion so we can utilize the same cache for experimental and non-experimental flows.
+                mp3_audio += chunk
+                
                 if self.synthesizer_config.should_encode_as_wav:
-                    wav_chunk = encode_as_wav(wav_chunk, self.synthesizer_config)
+                    chunk = encode_as_wav(chunk, self.synthesizer_config)
 
-                yield SynthesisResult.ChunkResult(wav_chunk, is_last)
+                yield SynthesisResult.ChunkResult(chunk, is_last)
                 # If this is the last chunk, break the loop
                 if is_last and create_speech_span is not None:
+                    cache_key = self.get_cache_key(message.text)
+                    self.cache[cache_key] = mp3_audio
                     create_speech_span.end()
                     break
         except asyncio.CancelledError:
@@ -107,8 +115,20 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             voice.settings = self.elevenlabs.VoiceSettings(
                 stability=self.stability, similarity_boost=self.similarity_boost
             )
-        url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
 
+        cache_key = self.get_cache_key(message.text)
+        if cache_key in self.cache:
+            output_bytes_io = decode_mp3(self.cache[cache_key])
+            result = self.create_synthesis_result_from_wav(
+                file=output_bytes_io,
+                message=message,
+                chunk_size=chunk_size,
+            )
+            return result
+        
+        self.logger.debug("Synthesizing message - message not found in cache")
+    
+        url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
         if self.experimental_streaming:
             url += "/stream"
 
@@ -137,10 +157,11 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         )
         if not response.ok:
             raise Exception(f"ElevenLabs API returned {response.status} status code")
+            
         if self.experimental_streaming:
             return SynthesisResult(
                 self.experimental_streaming_output_generator(
-                    response, chunk_size, create_speech_span
+                    response, chunk_size, create_speech_span, message
                 ),  # should be wav
                 lambda seconds: self.get_message_cutoff_from_voice_speed(
                     message, seconds, self.words_per_minute
@@ -148,6 +169,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             )
         else:
             audio_data = await response.read()
+            self.cache[cache_key] = audio_data
             create_speech_span.end()
             convert_span = tracer.start_span(
                 f"synthesizer.{SynthesizerType.ELEVEN_LABS.value.split('_', 1)[-1]}.convert",
@@ -162,3 +184,6 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             convert_span.end()
 
             return result
+        
+    def get_cache_key(self, text) -> str:
+        return self.synthesizer_config.__hash__() + text

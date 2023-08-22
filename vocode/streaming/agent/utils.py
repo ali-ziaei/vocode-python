@@ -24,7 +24,7 @@ from vocode.streaming.models.transcript import (
     Transcript,
 )
 
-SENTENCE_ENDINGS = [".", "!", "?", "\n"]
+SENTENCE_ENDINGS = [".", "!", "?", "\n", ","]
 
 
 async def collate_response_async(

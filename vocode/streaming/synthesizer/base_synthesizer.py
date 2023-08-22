@@ -240,7 +240,6 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
 
 # Every (phone) call instantiates a new BaseSynthesizer, but we want our cache to function across calls.
 # Instead of modifying larger parts of the vocode repo to pass an instance of the cache around, we just return the same instance each time here.
-# However, this assumes each vocode instance is only ever used with a single voice type.
 class TTSCacheManager:
     _instance = None
     def __new__(c):

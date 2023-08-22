@@ -12,6 +12,8 @@ from vocode.streaming.telephony.constants import (
 from .model import BaseModel, TypedModel
 from .audio_encoding import AudioEncoding
 
+import hashlib
+
 
 class SynthesizerType(str, Enum):
     BASE = "synthesizer_base"
@@ -84,6 +86,17 @@ class AzureSynthesizerConfig(SynthesizerConfig, type=SynthesizerType.AZURE.value
     rate: int = AZURE_SYNTHESIZER_DEFAULT_RATE
     language_code: str = "en-US"
 
+    def __hash__(self):
+        hash = hashlib.sha256()
+        hash.update(bytes(self.__class__.__name__, 'utf-8'))
+        hash.update(bytes(self.voice_name, 'utf-8'))
+        hash.update(bytes(str(self.pitch), 'utf-8'))
+        hash.update(bytes(str(self.rate), 'utf-8'))
+        hash.update(bytes(str(self.sampling_rate), 'utf-8'))
+        hash.update(bytes(str(self.audio_encoding), 'utf-8'))
+        hash.update(bytes(str(self.should_encode_as_wav), 'utf-8'))
+        # TODO: hash.update(bytes(str(self.sentiment_config), 'utf-8'))
+        return hash.hexdigest()
 
 DEFAULT_GOOGLE_LANGUAGE_CODE = "en-US"
 DEFAULT_GOOGLE_VOICE_NAME = "en-US-Neural2-I"
@@ -132,6 +145,21 @@ class ElevenLabsSynthesizerConfig(
         ):
             raise ValueError("optimize_streaming_latency must be between 0 and 4.")
         return optimize_streaming_latency
+    
+    def __hash__(self):
+        hash = hashlib.sha256()
+        hash.update(bytes(self.__class__.__name__, 'utf-8'))
+        hash.update(bytes(self.voice_id, 'utf-8'))
+        hash.update(bytes(str(self.optimize_streaming_latency), 'utf-8'))
+        hash.update(bytes(str(self.experimental_streaming), 'utf-8'))
+        hash.update(bytes(str(self.stability), 'utf-8'))
+        hash.update(bytes(str(self.similarity_boost), 'utf-8'))
+        hash.update(bytes(self.model_id, 'utf-8'))
+        hash.update(bytes(str(self.sampling_rate), 'utf-8'))
+        hash.update(bytes(str(self.audio_encoding), 'utf-8'))
+        hash.update(bytes(str(self.should_encode_as_wav), 'utf-8'))
+        # TODO: hash.update(bytes(str(self.sentiment_config), 'utf-8'))
+        return hash.hexdigest()
 
 
 RIME_DEFAULT_SPEAKER = "young_male_unmarked-1"

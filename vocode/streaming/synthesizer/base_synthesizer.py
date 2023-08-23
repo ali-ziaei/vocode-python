@@ -13,6 +13,7 @@ import math
 import io
 import wave
 import aiohttp
+from cachetools import LRUCache
 from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from opentelemetry import trace
@@ -121,6 +122,7 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
         synthesizer_config: SynthesizerConfigType,
         aiohttp_session: Optional[aiohttp.ClientSession] = None,
     ):
+        self.cache = TTSCacheManager().cache
         self.synthesizer_config = synthesizer_config
         if synthesizer_config.audio_encoding == AudioEncoding.MULAW:
             assert (
@@ -235,3 +237,16 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
     async def tear_down(self):
         if self.should_close_session_on_tear_down:
             await self.aiohttp_session.close()
+
+    def get_cache_key(self, msg) -> str:
+        return self.synthesizer_config.__hash__() + msg
+
+# Every (phone) call instantiates a new BaseSynthesizer, but we want our cache to function across calls.
+# Instead of modifying larger parts of the vocode repo to pass an instance of the cache around, we just return the same instance each time here.
+class TTSCacheManager:
+    _instance = None
+    def __new__(c):
+        if c._instance is None:
+            c._instance = super().__new__(c)
+            c._instance.cache = LRUCache(maxsize=2048)
+        return c._instance

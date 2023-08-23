@@ -207,8 +207,12 @@ class AzureSynthesizer(BaseSynthesizer[AzureSynthesizerConfig]):
         return ElementTree.tostring(ssml_root, encoding="unicode")
 
     def synthesize_ssml(self, ssml: str) -> speechsdk.AudioDataStream:
-        result = self.synthesizer.start_speaking_ssml_async(ssml).get()
-        return speechsdk.AudioDataStream(result)
+        cache_key = self.get_cache_key(ssml)
+        if not cache_key in self.cache:
+            self.logger.debug("Synthesizing SSML - SSML not found in cache")
+            self.cache[cache_key] = self.synthesizer.start_speaking_ssml_async(ssml).get()
+
+        return speechsdk.AudioDataStream(self.cache[cache_key])
 
     def ready_synthesizer(self):
         connection = speechsdk.Connection.from_speech_synthesizer(self.synthesizer)

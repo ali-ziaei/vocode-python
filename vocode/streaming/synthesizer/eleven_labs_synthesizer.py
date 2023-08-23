@@ -86,12 +86,10 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             while True:
                 # Get the wav chunk and the flag from the output queue of the MiniaudioWorker
                 wav_chunk, is_last = await miniaudio_worker.output_queue.get()
-                
-                # We collect the mp3 prior to wav conversion so we can utilize the same cache for experimental and non-experimental flows.
-                wav_audio += wav_chunk
-                
                 if self.synthesizer_config.should_encode_as_wav:
                     wav_chunk = encode_as_wav(wav_chunk, self.synthesizer_config)
+                
+                wav_audio += wav_chunk
 
                 yield SynthesisResult.ChunkResult(wav_chunk, is_last)
                 # If this is the last chunk, break the loop

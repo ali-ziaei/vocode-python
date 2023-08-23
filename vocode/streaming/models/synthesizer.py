@@ -13,7 +13,7 @@ from .model import BaseModel, TypedModel
 from .audio_encoding import AudioEncoding
 
 import hashlib
-
+from abc import abstractmethod
 
 class SynthesizerType(str, Enum):
     BASE = "synthesizer_base"
@@ -72,7 +72,10 @@ class SynthesizerConfig(TypedModel, type=SynthesizerType.BASE.value):
             audio_encoding=output_audio_config.audio_encoding,
             **kwargs
         )
-
+    
+    @abstractmethod
+    def __hash__(self) -> str:
+        pass
 
 AZURE_SYNTHESIZER_DEFAULT_VOICE_NAME = "en-US-SteffanNeural"
 AZURE_SYNTHESIZER_DEFAULT_PITCH = 0
@@ -86,16 +89,7 @@ class AzureSynthesizerConfig(SynthesizerConfig, type=SynthesizerType.AZURE.value
     language_code: str = "en-US"
 
     def __hash__(self):
-        hash = hashlib.sha256()
-        hash.update(bytes(self.__class__.__name__, 'utf-8'))
-        hash.update(bytes(self.voice_name, 'utf-8'))
-        hash.update(bytes(str(self.pitch), 'utf-8'))
-        hash.update(bytes(str(self.rate), 'utf-8'))
-        hash.update(bytes(str(self.sampling_rate), 'utf-8'))
-        hash.update(bytes(str(self.audio_encoding), 'utf-8'))
-        hash.update(bytes(str(self.should_encode_as_wav), 'utf-8'))
-        # TODO: hash.update(bytes(str(self.sentiment_config), 'utf-8'))
-        return hash.hexdigest()
+        return __hash__(self)
 
 DEFAULT_GOOGLE_LANGUAGE_CODE = "en-US"
 DEFAULT_GOOGLE_VOICE_NAME = "en-US-Neural2-I"
@@ -108,6 +102,9 @@ class GoogleSynthesizerConfig(SynthesizerConfig, type=SynthesizerType.GOOGLE.val
     voice_name: str = DEFAULT_GOOGLE_VOICE_NAME
     pitch: float = DEFAULT_GOOGLE_PITCH
     speaking_rate: float = DEFAULT_GOOGLE_SPEAKING_RATE
+
+    def __hash__(self):
+        return __hash__(self)
 
 
 ELEVEN_LABS_ADAM_VOICE_ID = "pNInz6obpgDQGcFmaJgB"
@@ -146,19 +143,7 @@ class ElevenLabsSynthesizerConfig(
         return optimize_streaming_latency
     
     def __hash__(self):
-        hash = hashlib.sha256()
-        hash.update(bytes(self.__class__.__name__, 'utf-8'))
-        hash.update(bytes(self.voice_id, 'utf-8'))
-        hash.update(bytes(str(self.optimize_streaming_latency), 'utf-8'))
-        hash.update(bytes(str(self.experimental_streaming), 'utf-8'))
-        hash.update(bytes(str(self.stability), 'utf-8'))
-        hash.update(bytes(str(self.similarity_boost), 'utf-8'))
-        hash.update(bytes(self.model_id, 'utf-8'))
-        hash.update(bytes(str(self.sampling_rate), 'utf-8'))
-        hash.update(bytes(str(self.audio_encoding), 'utf-8'))
-        hash.update(bytes(str(self.should_encode_as_wav), 'utf-8'))
-        # TODO: hash.update(bytes(str(self.sentiment_config), 'utf-8'))
-        return hash.hexdigest()
+        return __hash__(self)
 
 
 RIME_DEFAULT_SPEAKER = "young_male_unmarked-1"
@@ -170,6 +155,9 @@ class RimeSynthesizerConfig(SynthesizerConfig, type=SynthesizerType.RIME.value):
     speaker: str = RIME_DEFAULT_SPEAKER
     sampling_rate: int = RIME_DEFAULT_SAMPLE_RATE
     base_url: str = RIME_DEFAULT_BASE_URL
+
+    def __hash__(self):
+        return __hash__(self)
 
 
 COQUI_DEFAULT_SPEAKER_ID = "ebe2db86-62a6-49a1-907a-9a1360d4416e"
@@ -186,6 +174,9 @@ class CoquiSynthesizerConfig(SynthesizerConfig, type=SynthesizerType.COQUI.value
         if values.get("voice_prompt"):
             return None
         return voice_id or COQUI_DEFAULT_SPEAKER_ID
+    
+    def __hash__(self):
+        return __hash__(self)
 
 
 PLAYHT_DEFAULT_VOICE_ID = "larry"
@@ -199,6 +190,9 @@ class PlayHtSynthesizerConfig(SynthesizerConfig, type=SynthesizerType.PLAY_HT.va
     temperature: Optional[int] = None
     voice_id: str = PLAYHT_DEFAULT_VOICE_ID
 
+    def __hash__(self):
+        return __hash__(self)
+
 
 class CoquiTTSSynthesizerConfig(
     SynthesizerConfig, type=SynthesizerType.COQUI_TTS.value
@@ -207,9 +201,13 @@ class CoquiTTSSynthesizerConfig(
     speaker: Optional[str] = None
     language: Optional[str] = None
 
+    def __hash__(self):
+        return __hash__(self)
+
 
 class GTTSSynthesizerConfig(SynthesizerConfig, type=SynthesizerType.GTTS.value):
-    pass
+    def __hash__(self):
+        return __hash__(self)
 
 
 STREAM_ELEMENTS_SYNTHESIZER_DEFAULT_VOICE = "Brian"
@@ -220,7 +218,21 @@ class StreamElementsSynthesizerConfig(
 ):
     voice: str = STREAM_ELEMENTS_SYNTHESIZER_DEFAULT_VOICE
 
+    def __hash__(self):
+        return __hash__(self)
+
 
 class BarkSynthesizerConfig(SynthesizerConfig, type=SynthesizerType.BARK.value):
     preload_kwargs: Dict[str, Any] = {}
     generate_kwargs: Dict[str, Any] = {}
+
+    def __hash__(self):
+        return __hash__(self)
+
+
+def __hash__(instance) -> str:
+    hash = hashlib.sha256()
+    hash.update(bytes(instance.__class__.__name__, 'utf-8'))
+    for _, value in vars(instance).items():
+        hash.update(bytes(str(value), 'utf-8'))
+    return hash.hexdigest()

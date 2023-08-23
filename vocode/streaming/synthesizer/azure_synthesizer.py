@@ -305,6 +305,3 @@ class AzureSynthesizer(BaseSynthesizer[AzureSynthesizerConfig]):
                 message.text, ssml, seconds, word_boundary_event_pool
             ),
         )
-    
-    def get_cache_key(self, ssml) -> str:
-        return self.synthesizer_config.__hash__() + ssml

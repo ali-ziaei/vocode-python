@@ -238,6 +238,9 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
         if self.should_close_session_on_tear_down:
             await self.aiohttp_session.close()
 
+    def get_cache_key(self, msg) -> str:
+        return self.synthesizer_config.__hash__() + msg
+
 # Every (phone) call instantiates a new BaseSynthesizer, but we want our cache to function across calls.
 # Instead of modifying larger parts of the vocode repo to pass an instance of the cache around, we just return the same instance each time here.
 class TTSCacheManager:

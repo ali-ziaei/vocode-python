@@ -13,11 +13,11 @@ import math
 import io
 import wave
 import aiohttp
-from cachetools import LRUCache
 from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 from opentelemetry import trace
 
+from vocode.streaming.utils.cache import RedisRenewableTTLCache
 from vocode.streaming.agent.bot_sentiment_analyser import BotSentiment
 from vocode.streaming.models.agent import FillerAudioConfig
 from vocode.streaming.models.message import BaseMessage
@@ -122,7 +122,7 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
         synthesizer_config: SynthesizerConfigType,
         aiohttp_session: Optional[aiohttp.ClientSession] = None,
     ):
-        self.cache = TTSCacheManager().cache
+        self.cache : RedisRenewableTTLCache = TTSCacheManager().cache
         self.synthesizer_config = synthesizer_config
         if synthesizer_config.audio_encoding == AudioEncoding.MULAW:
             assert (
@@ -248,5 +248,5 @@ class TTSCacheManager:
     def __new__(c):
         if c._instance is None:
             c._instance = super().__new__(c)
-            c._instance.cache = LRUCache(maxsize=2048)
+            c._instance.cache = RedisRenewableTTLCache()
         return c._instance

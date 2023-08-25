@@ -95,7 +95,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 # If this is the last chunk, break the loop
                 if is_last and create_speech_span is not None:
                     cache_key = self.get_cache_key(message.text)
-                    self.cache[cache_key] = wav_audio
+                    self.cache.set(cache_key, wav_audio)
                     create_speech_span.end()
                     break
         except asyncio.CancelledError:
@@ -119,7 +119,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             )
 
         cache_key = self.get_cache_key(message.text)
-        if not cache_key in self.cache:
+        audio_data = self.cache.get(cache_key)
+        if audio_data is None:
             self.logger.debug("Synthesizing message - message not found in cache")
         
             url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
@@ -163,12 +164,13 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 )
             else:
                 create_speech_span.end()
-                self.cache[cache_key] = await response.read()
+                audio_data = await response.read()
+                self.cache.set(cache_key, audio_data)
             
         # Each of the branches below use the cached audio to generate a response
         if self.experimental_streaming:
             return SynthesisResult(
-                self.cached_chunk_generator(self.cache[cache_key]),
+                self.cached_chunk_generator(audio_data),
                 lambda seconds: self.get_message_cutoff_from_voice_speed(
                     message, seconds, self.words_per_minute
                 ),
@@ -177,7 +179,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             convert_span = tracer.start_span(
                 f"synthesizer.{SynthesizerType.ELEVEN_LABS.value.split('_', 1)[-1]}.convert",
             )
-            output_bytes_io = decode_mp3(self.cache[cache_key])
+            output_bytes_io = decode_mp3(audio_data)
 
             result = self.create_synthesis_result_from_wav(
                 file=output_bytes_io,

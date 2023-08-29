@@ -249,7 +249,7 @@ class PollySynthesizerConfig(SynthesizerConfig, type=SynthesizerType.POLLY.value
 
 def __hash__(instance) -> str:
     hash = hashlib.sha256()
-    hash.update(bytes(instance.__class__.__name__, "utf-8"))
+    hash.update(bytes(getattr(instance, "type"), "utf-8"))
     for _, value in vars(instance).items():
         hash.update(bytes(str(value), "utf-8"))
     return hash.hexdigest()

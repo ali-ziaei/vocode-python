@@ -4,13 +4,11 @@ import time
 from typing import Any, AsyncGenerator, Optional, Tuple, Union
 import wave
 import aiohttp
-from opentelemetry.trace import Span
 
 from vocode import getenv
 from vocode.streaming.synthesizer.base_synthesizer import (
     BaseSynthesizer,
     SynthesisResult,
-    encode_as_wav,
     tracer,
 )
 from vocode.streaming.models.synthesizer import (
@@ -48,6 +46,12 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         self.optimize_streaming_latency = synthesizer_config.optimize_streaming_latency
         self.words_per_minute = 150
         self.experimental_streaming = synthesizer_config.experimental_streaming
+        self.logger = logger or logging.getLogger(__name__)
+
+    async def cached_chunk_generator(
+        self, cached_audio: bytes
+    ) -> AsyncGenerator[SynthesisResult.ChunkResult, None]:
+        yield SynthesisResult.ChunkResult(cached_audio, True)
 
     async def create_speech(
         self,
@@ -60,48 +64,67 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             voice.settings = self.elevenlabs.VoiceSettings(
                 stability=self.stability, similarity_boost=self.similarity_boost
             )
-        url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
 
-        if self.experimental_streaming:
-            url += "/stream"
+        cache_key = self.get_cache_key(message.text)
+        audio_data = self.cache.get(cache_key)
+        if audio_data is None:
+            self.logger.debug("Synthesizing message - message not found in cache")
 
-        if self.optimize_streaming_latency:
-            url += f"?optimize_streaming_latency={self.optimize_streaming_latency}"
-        headers = {"xi-api-key": self.api_key}
-        body = {
-            "text": message.text,
-            "voice_settings": voice.settings.dict() if voice.settings else None,
-        }
-        if self.model_id:
-            body["model_id"] = self.model_id
+            url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
+            if self.experimental_streaming:
+                url += "/stream"
 
-        create_speech_span = tracer.start_span(
-            f"synthesizer.{SynthesizerType.ELEVEN_LABS.value.split('_', 1)[-1]}.create_total",
-        )
+            if self.optimize_streaming_latency:
+                url += f"?optimize_streaming_latency={self.optimize_streaming_latency}"
+            headers = {"xi-api-key": self.api_key}
+            body = {
+                "text": message.text,
+                "voice_settings": voice.settings.dict() if voice.settings else None,
+            }
+            if self.model_id:
+                body["model_id"] = self.model_id
 
-        session = self.aiohttp_session
+            create_speech_span = tracer.start_span(
+                f"synthesizer.{SynthesizerType.ELEVEN_LABS.value.split('_', 1)[-1]}.create_total",
+            )
 
-        response = await session.request(
-            "POST",
-            url,
-            json=body,
-            headers=headers,
-            timeout=aiohttp.ClientTimeout(total=15),
-        )
-        if not response.ok:
-            raise Exception(f"ElevenLabs API returned {response.status} status code")
+            session = self.aiohttp_session
+
+            response = await session.request(
+                "POST",
+                url,
+                json=body,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=15),
+            )
+            if not response.ok:
+                raise Exception(
+                    f"ElevenLabs API returned {response.status} status code"
+                )
+
+            if self.experimental_streaming:
+                return SynthesisResult(
+                    self.experimental_mp3_streaming_output_generator(
+                        response, chunk_size, create_speech_span, message
+                    ),  # should be wav
+                    lambda seconds: self.get_message_cutoff_from_voice_speed(
+                        message, seconds, self.words_per_minute
+                    ),
+                )
+            else:
+                create_speech_span.end()
+                audio_data = await response.read()
+                self.cache.set(cache_key, audio_data)
+
+        # Each of the branches below use the cached audio to generate a response
         if self.experimental_streaming:
             return SynthesisResult(
-                self.experimental_mp3_streaming_output_generator(
-                    response, chunk_size, create_speech_span
-                ),  # should be wav
+                self.cached_chunk_generator(audio_data),
                 lambda seconds: self.get_message_cutoff_from_voice_speed(
                     message, seconds, self.words_per_minute
                 ),
             )
         else:
-            audio_data = await response.read()
-            create_speech_span.end()
             convert_span = tracer.start_span(
                 f"synthesizer.{SynthesizerType.ELEVEN_LABS.value.split('_', 1)[-1]}.convert",
             )

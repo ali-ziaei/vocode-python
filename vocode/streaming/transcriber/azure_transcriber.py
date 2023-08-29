@@ -75,6 +75,13 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
 
         self.speech = speechsdk.SpeechRecognizer(**speech_params)
 
+        if transcriber_config.phrases:
+            speech_phrase_list_grammer = speechsdk.PhraseListGrammar.from_recognizer(
+                self.speech
+            )
+            for phrase in transcriber_config.phrases:
+                speech_phrase_list_grammer.addPhrase(phrase)
+
         self._ended = False
         self.is_ready = False
 

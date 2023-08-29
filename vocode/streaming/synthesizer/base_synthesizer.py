@@ -21,6 +21,7 @@ from nltk.tokenize.treebank import TreebankWordDetokenizer
 from opentelemetry import trace
 from opentelemetry.trace import Span
 
+from vocode.streaming.utils.cache import RedisRenewableTTLCache
 from vocode.streaming.agent.bot_sentiment_analyser import BotSentiment
 from vocode.streaming.models.agent import FillerAudioConfig
 from vocode.streaming.models.message import BaseMessage
@@ -126,6 +127,7 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
         synthesizer_config: SynthesizerConfigType,
         aiohttp_session: Optional[aiohttp.ClientSession] = None,
     ):
+        self.cache: RedisRenewableTTLCache = TTSCacheManager().cache
         self.synthesizer_config = synthesizer_config
         if synthesizer_config.audio_encoding == AudioEncoding.MULAW:
             assert (
@@ -247,6 +249,7 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
         response: aiohttp.ClientResponse,
         chunk_size: int,
         create_speech_span: Optional[Span],
+        message: Optional[BaseMessage] = None,
     ) -> AsyncGenerator[SynthesisResult.ChunkResult, None]:
         miniaudio_worker_input_queue: asyncio.Queue[
             Union[bytes, None]
@@ -271,6 +274,7 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
 
         try:
             asyncio.create_task(send_chunks())
+            wav_audio = b""
 
             # Await the output queue of the MiniaudioWorker and yield the wav chunks in another loop
             while True:
@@ -278,10 +282,12 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
                 wav_chunk, is_last = await miniaudio_worker.output_queue.get()
                 if self.synthesizer_config.should_encode_as_wav:
                     wav_chunk = encode_as_wav(wav_chunk, self.synthesizer_config)
-
+                wav_audio += wav_chunk
                 yield SynthesisResult.ChunkResult(wav_chunk, is_last)
                 # If this is the last chunk, break the loop
                 if is_last and create_speech_span is not None:
+                    cache_key = self.get_cache_key(message.text)
+                    self.cache.set(cache_key, wav_audio)
                     create_speech_span.end()
                     break
         except asyncio.CancelledError:
@@ -292,3 +298,18 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
     async def tear_down(self):
         if self.should_close_session_on_tear_down:
             await self.aiohttp_session.close()
+
+    def get_cache_key(self, msg) -> str:
+        return self.synthesizer_config.__hash__() + msg
+
+
+# Every (phone) call instantiates a new BaseSynthesizer, but we want our cache to function across calls.
+# Instead of modifying larger parts of the vocode repo to pass an instance of the cache around, we just return the same instance each time here.
+class TTSCacheManager:
+    _instance = None
+
+    def __new__(c):
+        if c._instance is None:
+            c._instance = super().__new__(c)
+            c._instance.cache = RedisRenewableTTLCache()
+        return c._instance

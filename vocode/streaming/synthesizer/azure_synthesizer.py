@@ -61,13 +61,12 @@ class AzureSynthesizer(BaseSynthesizer[AzureSynthesizerConfig]):
         self,
         synthesizer_config: AzureSynthesizerConfig,
         logger: Optional[logging.Logger] = None,
-        azure_speech_key: Optional[str] = None,
         azure_speech_region: Optional[str] = None,
         aiohttp_session: Optional[aiohttp.ClientSession] = None,
     ):
         super().__init__(synthesizer_config, aiohttp_session)
         # Instantiates a client
-        azure_speech_key = azure_speech_key or getenv("AZURE_SPEECH_KEY")
+        azure_speech_key = synthesizer_config.speech_key or getenv("AZURE_SPEECH_KEY")
         azure_speech_region = azure_speech_region or getenv("AZURE_SPEECH_REGION")
         if not azure_speech_key:
             raise ValueError(

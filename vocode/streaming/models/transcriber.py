@@ -121,6 +121,7 @@ class GoogleTranscriberConfig(TranscriberConfig, type=TranscriberType.GOOGLE.val
 
 
 class AzureTranscriberConfig(TranscriberConfig, type=TranscriberType.AZURE.value):
+    speech_key: Optional[str] = None
     language: str = AZURE_DEFAULT_LANGUAGE
     candidate_languages: Optional[List[str]] = None
     phrases: Optional[List[str]] = None

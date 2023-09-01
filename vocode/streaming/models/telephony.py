@@ -12,6 +12,7 @@ from vocode.streaming.models.transcriber import (
     PunctuationEndpointingConfig,
     TranscriberConfig,
 )
+from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.telephony.constants import (
     DEFAULT_AUDIO_ENCODING,
     DEFAULT_CHUNK_SIZE,
@@ -44,6 +45,7 @@ class CallEntity(BaseModel):
 class CreateInboundCall(BaseModel):
     recipient: CallEntity
     caller: CallEntity
+    audio_service_config: Optional[AudioServiceConfig] = None
     transcriber_config: Optional[TranscriberConfig] = None
     agent_config: AgentConfig
     synthesizer_config: Optional[SynthesizerConfig] = None
@@ -63,6 +65,7 @@ class EndOutboundCall(BaseModel):
 class CreateOutboundCall(BaseModel):
     recipient: CallEntity
     caller: CallEntity
+    audio_service_config: Optional[AudioServiceConfig] = None
     transcriber_config: Optional[TranscriberConfig] = None
     agent_config: AgentConfig
     synthesizer_config: Optional[SynthesizerConfig] = None
@@ -77,6 +80,7 @@ class DialIntoZoomCall(BaseModel):
     caller: CallEntity
     zoom_meeting_id: str
     zoom_meeting_password: Optional[str]
+    audio_config: Optional[AudioServiceConfig] = None
     transcriber_config: Optional[TranscriberConfig] = None
     agent_config: AgentConfig
     synthesizer_config: Optional[SynthesizerConfig] = None
@@ -92,11 +96,16 @@ class CallConfigType(str, Enum):
 
 
 class BaseCallConfig(TypedModel, type=CallConfigType.BASE.value):
+    audio_service_config: AudioServiceConfig
     transcriber_config: TranscriberConfig
     agent_config: AgentConfig
     synthesizer_config: SynthesizerConfig
     from_phone: str
     to_phone: str
+
+    @staticmethod
+    def default_audio_service_config():
+        raise NotImplementedError
 
     @staticmethod
     def default_transcriber_config():
@@ -110,6 +119,12 @@ class BaseCallConfig(TypedModel, type=CallConfigType.BASE.value):
 class TwilioCallConfig(BaseCallConfig, type=CallConfigType.TWILIO.value):
     twilio_config: TwilioConfig
     twilio_sid: str
+
+    @staticmethod
+    def default_audio_service_config():
+        return AudioServiceConfig(
+            sampling_rate=DEFAULT_SAMPLING_RATE, audio_encoding=DEFAULT_AUDIO_ENCODING
+        )
 
     @staticmethod
     def default_transcriber_config():
@@ -134,6 +149,12 @@ class VonageCallConfig(BaseCallConfig, type=CallConfigType.VONAGE.value):
     vonage_config: VonageConfig
     vonage_uuid: str
     output_to_speaker: bool = False
+
+    @staticmethod
+    def default_audio_service_config():
+        return AudioServiceConfig(
+            sampling_rate=VONAGE_SAMPLING_RATE, audio_encoding=VONAGE_AUDIO_ENCODING
+        )
 
     @staticmethod
     def default_transcriber_config():

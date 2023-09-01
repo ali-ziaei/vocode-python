@@ -68,6 +68,9 @@ from vocode.streaming.utils.worker import (
     InterruptibleWorker,
 )
 
+from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioService
+from vocode.streaming.models.audio import AudioServiceConfig
+
 OutputDeviceType = TypeVar("OutputDeviceType", bound=BaseOutputDevice)
 
 
@@ -368,6 +371,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
     def __init__(
         self,
         output_device: OutputDeviceType,
+        audio_service: BaseThreadAsyncAudioService[AudioServiceConfig],
         transcriber: BaseTranscriber[TranscriberConfig],
         agent: BaseAgent,
         synthesizer: BaseSynthesizer,
@@ -382,6 +386,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             conversation_id=self.id,
         )
         self.output_device = output_device
+        self.audio_service = audio_service
         self.transcriber = transcriber
         self.agent = agent
         self.synthesizer = synthesizer
@@ -399,6 +404,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
             InterruptibleAgentResponseEvent[FillerAudio]
         ] = asyncio.Queue()
         self.state_manager = self.create_state_manager()
+
+        self.audio_service = self.audio_service(
+            input_queue=asyncio.Queue(),
+            output_queue=self.transcriber.input_queue,
+        )
+
         self.transcriptions_worker = self.TranscriptionsWorker(
             input_queue=self.transcriber.output_queue,
             output_queue=self.agent.get_input_queue(),
@@ -464,6 +475,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         return ConversationStateManager(conversation=self)
 
     async def start(self, mark_ready: Optional[Callable[[], Awaitable[None]]] = None):
+        self.audio_service.start()
         self.transcriber.start()
         self.transcriptions_worker.start()
         self.agent_responses_worker.start()
@@ -715,6 +727,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.logger.debug("Terminating actions worker")
             self.actions_worker.terminate()
         self.logger.debug("Successfully terminated")
+        self.logger.debug("Terminating audio service worker")
+        self.audio_service.terminate()
 
     def is_active(self):
         return self.active

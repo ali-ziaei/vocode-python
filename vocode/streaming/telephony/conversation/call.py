@@ -25,6 +25,8 @@ from vocode.streaming.transcriber.factory import TranscriberFactory
 from vocode.streaming.utils.events_manager import EventsManager
 from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
 from vocode.streaming.utils import create_conversation_id
+from vocode.streaming.models.audio import AudioServiceConfig
+from vocode.streaming.audio.factory import AudioServiceFactory
 
 TelephonyOutputDeviceType = TypeVar(
     "TelephonyOutputDeviceType", bound=Union[TwilioOutputDevice, VonageOutputDevice]
@@ -40,9 +42,11 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         config_manager: BaseConfigManager,
         output_device: TelephonyOutputDeviceType,
         agent_config: AgentConfig,
+        audio_service_config: AudioServiceConfig,
         transcriber_config: TranscriberConfig,
         synthesizer_config: SynthesizerConfig,
         conversation_id: Optional[str] = None,
+        audio_service_factory: AudioServiceFactory = AudioServiceFactory(),
         transcriber_factory: TranscriberFactory = TranscriberFactory(),
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
@@ -61,6 +65,9 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         self.config_manager = config_manager
         super().__init__(
             output_device,
+            audio_service_factory.create_audio_service(
+                audio_service_config, logger=logger
+            ),
             transcriber_factory.create_transcriber(transcriber_config, logger=logger),
             agent_factory.create_agent(agent_config, logger=logger),
             synthesizer_factory.create_synthesizer(synthesizer_config, logger=logger),

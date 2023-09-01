@@ -102,6 +102,26 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.interruptible_events.put_nowait(interruptible_event)
             return interruptible_event
 
+    class AudioServiceWorker(AsyncQueueWorker):
+        def __init__(
+            self,
+            input_queue: asyncio.Queue[bytes],
+            output_queue: asyncio.Queue[bytes],
+            conversation: "StreamingConversation",
+            interruptible_event_factory: InterruptibleEventFactory,
+        ):
+            super().__init__(input_queue, output_queue)
+            self.input_queue = input_queue
+            self.output_queue = output_queue
+            self.conversation = conversation
+            self.interruptible_event_factory = interruptible_event_factory
+
+        async def process(self, item: bytes):
+            event = self.interruptible_event_factory.create_interruptible_event(
+                payload=item, is_interruptible=False
+            )
+            self.output_queue.put_nowait(event)
+
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed
         and sends final transcriptions to the output queue"""
@@ -405,9 +425,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
         ] = asyncio.Queue()
         self.state_manager = self.create_state_manager()
 
-        self.audio_service = self.audio_service(
-            input_queue=asyncio.Queue(),
+        self.audio_service_worker = self.AudioServiceWorker(
+            input_queue=self.audio_service.output_queue,
             output_queue=self.transcriber.input_queue,
+            conversation=self,
+            interruptible_event_factory=self.interruptible_event_factory,
         )
 
         self.transcriptions_worker = self.TranscriptionsWorker(
@@ -477,6 +499,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
     async def start(self, mark_ready: Optional[Callable[[], Awaitable[None]]] = None):
         self.audio_service.start()
         self.transcriber.start()
+        self.audio_service_worker.start()
         self.transcriptions_worker.start()
         self.agent_responses_worker.start()
         self.synthesis_results_worker.start()
@@ -727,8 +750,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.logger.debug("Terminating actions worker")
             self.actions_worker.terminate()
         self.logger.debug("Successfully terminated")
-        self.logger.debug("Terminating audio service worker")
+        self.logger.debug("Terminating audio service")
         self.audio_service.terminate()
+        self.logger.debug("Terminating audio service worker")
+        self.audio_service_worker.terminate()
 
     def is_active(self):
         return self.active

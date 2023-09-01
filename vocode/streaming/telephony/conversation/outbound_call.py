@@ -16,6 +16,8 @@ from vocode.streaming.models.telephony import (
 from vocode.streaming.models.transcriber import (
     TranscriberConfig,
 )
+from vocode.streaming.models.audio import AudioServiceConfig
+
 from vocode.streaming.telephony.client.base_telephony_client import BaseTelephonyClient
 from vocode.streaming.telephony.client.twilio_client import TwilioClient
 from vocode.streaming.telephony.client.vonage_client import VonageClient
@@ -35,6 +37,7 @@ class OutboundCall:
         agent_config: AgentConfig,
         twilio_config: Optional[TwilioConfig] = None,
         vonage_config: Optional[VonageConfig] = None,
+        audio_service_config: Optional[AudioServiceConfig] = None,
         transcriber_config: Optional[TranscriberConfig] = None,
         synthesizer_config: Optional[SynthesizerConfig] = None,
         conversation_id: Optional[str] = None,
@@ -68,6 +71,9 @@ class OutboundCall:
         assert not output_to_speaker or isinstance(
             self.telephony_client, VonageClient
         ), "Output to speaker is only supported for Vonage calls"
+        self.audio_service_config = self.create_audio_service_config(
+            audio_service_config
+        )
         self.transcriber_config = self.create_transcriber_config(transcriber_config)
         self.synthesizer_config = self.create_synthesizer_config(synthesizer_config)
         self.telephony_id = None
@@ -82,6 +88,18 @@ class OutboundCall:
             return VonageClient(
                 base_url=self.base_url, vonage_config=self.vonage_config
             )
+        else:
+            raise ValueError("No telephony config provided")
+
+    def create_audio_service_config(
+        self, audio_service_config_override: Optional[AudioServiceConfig]
+    ) -> AudioServiceConfig:
+        if audio_service_config_override is not None:
+            return audio_service_config_override
+        if self.twilio_config is not None:
+            return TwilioCallConfig.default_audio_service_config()
+        elif self.vonage_config is not None:
+            return VonageCallConfig.default_audio_service_config()
         else:
             raise ValueError("No telephony config provided")
 
@@ -125,6 +143,7 @@ class OutboundCall:
         )
         if isinstance(self.telephony_client, TwilioClient):
             call_config = TwilioCallConfig(
+                audio_service_config=self.audio_service_config,
                 transcriber_config=self.transcriber_config,
                 agent_config=self.agent_config,
                 synthesizer_config=self.synthesizer_config,
@@ -135,6 +154,7 @@ class OutboundCall:
             )
         elif isinstance(self.telephony_client, VonageClient):
             call_config = VonageCallConfig(
+                audio_service_config=self.audio_service_config,
                 transcriber_config=self.transcriber_config,
                 agent_config=self.agent_config,
                 synthesizer_config=self.synthesizer_config,

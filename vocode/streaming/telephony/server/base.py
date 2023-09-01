@@ -159,7 +159,7 @@ class TelephonyServer:
             vonage_config: VonageConfig, vonage_answer_request: VonageAnswerRequest
         ):
             call_config = VonageCallConfig(
-                audio_config=inbound_call_config.audio_config
+                audio_service_config=inbound_call_config.audio_service_config
                 or VonageCallConfig.default_audio_service_config(),
                 transcriber_config=inbound_call_config.transcriber_config
                 or VonageCallConfig.default_transcriber_config(),

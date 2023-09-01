@@ -57,9 +57,11 @@ class BaseThreadAsyncAudioService(
 
     def __init__(
         self,
+        conversation_id: str,
         audio_service_config: AudioServiceConfigType,
         logger: Optional[logging.Logger] = None,
     ):
+        self.conversation_id = conversation_id
         self.is_muted = False
         self._ended = False
         self.input_queue: asyncio.Queue[bytes] = asyncio.Queue()

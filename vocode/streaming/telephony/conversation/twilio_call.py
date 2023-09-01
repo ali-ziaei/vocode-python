@@ -157,9 +157,9 @@ class TwilioCall(Call[TwilioOutputDevice]):
                 )
                 self.logger.debug(f"Filling {bytes_to_fill} bytes of silence")
                 # NOTE: 0xff is silence for mulaw audio
-                self.receive_audio(b"\xff" * bytes_to_fill)
+                self.audio_service.send_audio(b"\xff" * bytes_to_fill)
             self.latest_media_timestamp = int(media["timestamp"])
-            self.receive_audio(chunk)
+            self.audio_service.send_audio(chunk)
         elif data["event"] == "stop":
             self.logger.debug(f"Media WS: Received event 'stop': {message}")
             self.logger.debug("Stopping...")

@@ -29,6 +29,8 @@ from vocode.streaming.utils.state_manager import (
     ConversationStateManager,
     VonageCallStateManager,
 )
+from vocode.streaming.models.audio import AudioServiceConfig
+from vocode.streaming.audio.factory import AudioServiceFactory
 
 
 class VonageCall(Call[VonageOutputDevice]):
@@ -39,11 +41,13 @@ class VonageCall(Call[VonageOutputDevice]):
         base_url: str,
         config_manager: BaseConfigManager,
         agent_config: AgentConfig,
+        audio_service_config: AudioServiceConfig,
         transcriber_config: TranscriberConfig,
         synthesizer_config: SynthesizerConfig,
         vonage_uuid: str,
         vonage_config: Optional[VonageConfig] = None,
         conversation_id: Optional[str] = None,
+        audio_service_factory: AudioServiceFactory = AudioServiceFactory(),
         transcriber_factory: TranscriberFactory = TranscriberFactory(),
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
@@ -58,6 +62,7 @@ class VonageCall(Call[VonageOutputDevice]):
             config_manager,
             VonageOutputDevice(output_to_speaker=output_to_speaker),
             agent_config,
+            audio_service_config,
             transcriber_config,
             synthesizer_config,
             conversation_id=conversation_id,

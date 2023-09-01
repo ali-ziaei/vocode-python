@@ -45,10 +45,9 @@ from vocode.streaming.utils.events_manager import EventsManager
 class AbstractInboundCallConfig(BaseModel, abc.ABC):
     url: str
     agent_config: AgentConfig
-    audio_config: Optional[AudioServiceConfig] = None
+    audio_service_config: Optional[AudioServiceConfig] = None
     transcriber_config: Optional[TranscriberConfig] = None
     synthesizer_config: Optional[SynthesizerConfig] = None
-    audio_config: Optional[AudioServiceConfig] = None
 
 
 class TwilioInboundCallConfig(AbstractInboundCallConfig):
@@ -137,7 +136,7 @@ class TelephonyServer:
             twilio_to: str = Form(alias="To"),
         ) -> Response:
             call_config = TwilioCallConfig(
-                audio_config=inbound_call_config.audio_config
+                audio_service_config=inbound_call_config.audio_service_config
                 or TwilioCallConfig.default_audio_service_config(),
                 transcriber_config=inbound_call_config.transcriber_config
                 or TwilioCallConfig.default_transcriber_config(),

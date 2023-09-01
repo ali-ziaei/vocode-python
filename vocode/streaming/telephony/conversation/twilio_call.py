@@ -27,6 +27,8 @@ from vocode.streaming.telephony.conversation.call import Call
 from vocode.streaming.transcriber.factory import TranscriberFactory
 from vocode.streaming.utils.events_manager import EventsManager
 from vocode.streaming.utils.state_manager import TwilioCallStateManager
+from vocode.streaming.models.audio import AudioServiceConfig
+from vocode.streaming.audio.factory import AudioServiceFactory
 
 
 class PhoneCallWebsocketAction(Enum):
@@ -41,11 +43,13 @@ class TwilioCall(Call[TwilioOutputDevice]):
         base_url: str,
         config_manager: BaseConfigManager,
         agent_config: AgentConfig,
+        audio_service_config: AudioServiceConfig,
         transcriber_config: TranscriberConfig,
         synthesizer_config: SynthesizerConfig,
         twilio_sid: str,
         twilio_config: Optional[TwilioConfig] = None,
         conversation_id: Optional[str] = None,
+        audio_service_factory: AudioServiceFactory = AudioServiceFactory(),
         transcriber_factory: TranscriberFactory = TranscriberFactory(),
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
@@ -59,10 +63,12 @@ class TwilioCall(Call[TwilioOutputDevice]):
             config_manager,
             TwilioOutputDevice(),
             agent_config,
+            audio_service_config,
             transcriber_config,
             synthesizer_config,
             conversation_id=conversation_id,
             events_manager=events_manager,
+            audio_service_factory=audio_service_factory,
             transcriber_factory=transcriber_factory,
             agent_factory=agent_factory,
             synthesizer_factory=synthesizer_factory,

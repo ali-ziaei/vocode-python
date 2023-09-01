@@ -16,6 +16,7 @@ from vocode.streaming.telephony.config_manager.base_config_manager import (
 from vocode.streaming.telephony.conversation.call import Call
 from vocode.streaming.telephony.conversation.twilio_call import TwilioCall
 from vocode.streaming.telephony.conversation.vonage_call import VonageCall
+from vocode.streaming.audio.factory import AudioServiceFactory
 from vocode.streaming.transcriber.factory import TranscriberFactory
 from vocode.streaming.utils.base_router import BaseRouter
 from vocode.streaming.utils.events_manager import EventsManager
@@ -26,6 +27,7 @@ class CallsRouter(BaseRouter):
         self,
         base_url: str,
         config_manager: BaseConfigManager,
+        audio_service_factory: AudioServiceFactory = AudioServiceFactory(),
         transcriber_factory: TranscriberFactory = TranscriberFactory(),
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
@@ -35,6 +37,7 @@ class CallsRouter(BaseRouter):
         super().__init__()
         self.base_url = base_url
         self.config_manager = config_manager
+        self.audio_service_factory = audio_service_factory
         self.transcriber_factory = transcriber_factory
         self.agent_factory = agent_factory
         self.synthesizer_factory = synthesizer_factory
@@ -50,6 +53,7 @@ class CallsRouter(BaseRouter):
         config_manager: BaseConfigManager,
         conversation_id: str,
         logger: logging.Logger,
+        audio_service_factory: AudioServiceFactory = AudioServiceFactory(),
         transcriber_factory: TranscriberFactory = TranscriberFactory(),
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
@@ -62,12 +66,14 @@ class CallsRouter(BaseRouter):
                 base_url=base_url,
                 logger=logger,
                 config_manager=config_manager,
+                audio_service_config=call_config.audio_service_config,
                 agent_config=call_config.agent_config,
                 transcriber_config=call_config.transcriber_config,
                 synthesizer_config=call_config.synthesizer_config,
                 twilio_config=call_config.twilio_config,
                 twilio_sid=call_config.twilio_sid,
                 conversation_id=conversation_id,
+                audio_service_factory=audio_service_factory,
                 transcriber_factory=transcriber_factory,
                 agent_factory=agent_factory,
                 synthesizer_factory=synthesizer_factory,
@@ -81,11 +87,13 @@ class CallsRouter(BaseRouter):
                 logger=logger,
                 config_manager=config_manager,
                 agent_config=call_config.agent_config,
+                audio_service_config=call_config.audio_service_config,
                 transcriber_config=call_config.transcriber_config,
                 synthesizer_config=call_config.synthesizer_config,
                 vonage_config=call_config.vonage_config,
                 vonage_uuid=call_config.vonage_uuid,
                 conversation_id=conversation_id,
+                audio_service_factory=audio_service_factory,
                 transcriber_factory=transcriber_factory,
                 agent_factory=agent_factory,
                 synthesizer_factory=synthesizer_factory,

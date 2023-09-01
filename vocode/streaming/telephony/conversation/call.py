@@ -66,7 +66,7 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         super().__init__(
             output_device,
             audio_service_factory.create_audio_service(
-                audio_service_config, logger=logger
+                conversation_id, audio_service_config, logger=logger
             ),
             transcriber_factory.create_transcriber(transcriber_config, logger=logger),
             agent_factory.create_agent(agent_config, logger=logger),

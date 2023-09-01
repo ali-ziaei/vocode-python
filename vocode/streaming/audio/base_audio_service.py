@@ -86,15 +86,7 @@ class BaseThreadAsyncAudioService(
     def generator(self):
         """audio frame generator"""
         while not self._ended:
-            try:
-                chunk = self.input_janus_queue.sync_q.get(timeout=5)
-            except queue.Empty:
-                return
-
-            if chunk is None:
-                return
-
-            data = [chunk]
+            data = []
             # Now consume whatever other data's still buffered.
             while True:
                 try:

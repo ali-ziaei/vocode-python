@@ -12,6 +12,7 @@ from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.models.synthesizer import SynthesizerConfig
 from vocode.streaming.models.transcriber import TranscriberConfig
 from vocode.streaming.synthesizer.factory import SynthesizerFactory
+from vocode.streaming.audio.factory import AudioServiceFactory
 from vocode.streaming.telephony.client.base_telephony_client import BaseTelephonyClient
 from vocode.streaming.telephony.client.twilio_client import TwilioClient
 from vocode.streaming.telephony.client.vonage_client import VonageClient
@@ -44,6 +45,7 @@ from vocode.streaming.utils.events_manager import EventsManager
 class AbstractInboundCallConfig(BaseModel, abc.ABC):
     url: str
     agent_config: AgentConfig
+    audio_config: Optional[AudioServiceConfig] = None
     transcriber_config: Optional[TranscriberConfig] = None
     synthesizer_config: Optional[SynthesizerConfig] = None
     audio_config: Optional[AudioServiceConfig] = None
@@ -69,6 +71,7 @@ class TelephonyServer:
         base_url: str,
         config_manager: BaseConfigManager,
         inbound_call_configs: List[AbstractInboundCallConfig] = [],
+        audio_service_factory: AudioServiceFactory = AudioServiceFactory(),
         transcriber_factory: TranscriberFactory = TranscriberFactory(),
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
@@ -85,6 +88,7 @@ class TelephonyServer:
             CallsRouter(
                 base_url=base_url,
                 config_manager=self.config_manager,
+                audio_service_factory=audio_service_factory,
                 transcriber_factory=transcriber_factory,
                 agent_factory=agent_factory,
                 synthesizer_factory=synthesizer_factory,
@@ -133,6 +137,8 @@ class TelephonyServer:
             twilio_to: str = Form(alias="To"),
         ) -> Response:
             call_config = TwilioCallConfig(
+                audio_config=inbound_call_config.audio_config
+                or TwilioCallConfig.default_audio_service_config(),
                 transcriber_config=inbound_call_config.transcriber_config
                 or TwilioCallConfig.default_transcriber_config(),
                 agent_config=inbound_call_config.agent_config,
@@ -154,6 +160,8 @@ class TelephonyServer:
             vonage_config: VonageConfig, vonage_answer_request: VonageAnswerRequest
         ):
             call_config = VonageCallConfig(
+                audio_config=inbound_call_config.audio_config
+                or VonageCallConfig.default_audio_service_config(),
                 transcriber_config=inbound_call_config.transcriber_config
                 or VonageCallConfig.default_transcriber_config(),
                 agent_config=inbound_call_config.agent_config,

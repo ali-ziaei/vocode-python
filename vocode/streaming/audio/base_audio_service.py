@@ -1,7 +1,11 @@
+import logging
+from typing import Optional
+import asyncio
+import queue
+import audioop
+
 from typing import TypeVar, Generic
 from vocode.streaming.utils.worker import ThreadAsyncWorker
-import asyncio
-import audioop
 from vocode.streaming.models.audio_encoding import AudioEncoding
 from vocode.streaming.models.audio import AudioServiceConfig
 
@@ -54,12 +58,18 @@ class BaseThreadAsyncAudioService(
     def __init__(
         self,
         audio_service_config: AudioServiceConfigType,
+        logger: Optional[logging.Logger] = None,
     ):
         self.is_muted = False
+        self._ended = False
         self.input_queue: asyncio.Queue[bytes] = asyncio.Queue()
         self.output_queue: asyncio.Queue[bytes] = asyncio.Queue()
         ThreadAsyncWorker.__init__(self, self.input_queue, self.output_queue)
         AbstractAudioService.__init__(self, audio_service_config)
+        self.logger = logger
+
+    def process(self, chunk: bytes) -> bytes:
+        raise NotImplementedError
 
     def _run_loop(self):
         raise NotImplementedError
@@ -71,5 +81,30 @@ class BaseThreadAsyncAudioService(
         else:
             self.consume_nonblocking(self.create_silent_chunk(len(chunk)))
 
+    def generator(self):
+        """audio frame generator"""
+        while not self._ended:
+            try:
+                chunk = self.input_janus_queue.sync_q.get(timeout=5)
+            except queue.Empty:
+                return
+
+            if chunk is None:
+                return
+
+            data = [chunk]
+            # Now consume whatever other data's still buffered.
+            while True:
+                try:
+                    chunk = self.input_janus_queue.sync_q.get_nowait()
+                    if chunk is None:
+                        return
+                    data.append(chunk)
+                except queue.Empty:
+                    break
+
+            yield b"".join(data)
+
     def terminate(self):
+        self._ended = True
         ThreadAsyncWorker.terminate(self)

@@ -107,20 +107,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self,
             input_queue: asyncio.Queue[bytes],
             output_queue: asyncio.Queue[bytes],
-            conversation: "StreamingConversation",
-            interruptible_event_factory: InterruptibleEventFactory,
         ):
             super().__init__(input_queue, output_queue)
             self.input_queue = input_queue
             self.output_queue = output_queue
-            self.conversation = conversation
-            self.interruptible_event_factory = interruptible_event_factory
 
         async def process(self, item: bytes):
-            event = self.interruptible_event_factory.create_interruptible_event(
-                payload=item, is_interruptible=False
-            )
-            self.output_queue.put_nowait(event)
+            self.output_queue.put_nowait(item)
 
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed
@@ -428,8 +421,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.audio_service_worker = self.AudioServiceWorker(
             input_queue=self.audio_service.output_queue,
             output_queue=self.transcriber.input_queue,
-            conversation=self,
-            interruptible_event_factory=self.interruptible_event_factory,
         )
 
         self.transcriptions_worker = self.TranscriptionsWorker(

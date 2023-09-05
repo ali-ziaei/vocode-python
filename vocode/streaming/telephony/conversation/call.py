@@ -1,5 +1,6 @@
 from fastapi import WebSocket
 from enum import Enum
+import os
 import logging
 from typing import Optional, TypeVar, Union
 from vocode.streaming.agent.factory import AgentFactory
@@ -54,7 +55,15 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         logger: Optional[logging.Logger] = None,
     ):
         conversation_id = conversation_id or create_conversation_id()
-        logger = wrap_logger(
+
+        if events_manager.log_dir:
+            os.makedirs(events_manager.log_dir, exist_ok=True)
+
+            log_file = os.path.join(events_manager.log_dir, conversation_id + ".log")
+            file_handler = logging.FileHandler(log_file)
+            logger.addHandler(file_handler)
+
+        self.logger = wrap_logger(
             logger or logging.getLogger(__name__),
             conversation_id=conversation_id,
         )
@@ -66,15 +75,19 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         super().__init__(
             output_device,
             audio_service_factory.create_audio_service(
-                conversation_id, audio_service_config, logger=logger
+                conversation_id, audio_service_config, logger=self.logger
             ),
-            transcriber_factory.create_transcriber(transcriber_config, logger=logger),
-            agent_factory.create_agent(agent_config, logger=logger),
-            synthesizer_factory.create_synthesizer(synthesizer_config, logger=logger),
+            transcriber_factory.create_transcriber(
+                transcriber_config, logger=self.logger
+            ),
+            agent_factory.create_agent(agent_config, logger=self.logger),
+            synthesizer_factory.create_synthesizer(
+                synthesizer_config, logger=self.logger
+            ),
             conversation_id=conversation_id,
             per_chunk_allowance_seconds=0.01,
             events_manager=events_manager,
-            logger=logger,
+            logger=self.logger,
         )
 
     def attach_ws(self, ws: WebSocket):

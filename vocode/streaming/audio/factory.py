@@ -10,7 +10,10 @@ class AudioServiceFactory:
         conversation_id: str,
         audio_service_config: AudioServiceConfig,
         logger: Optional[logging.Logger] = None,
+        log_dir: Optional[str] = None,
     ):
         if isinstance(audio_service_config, AudioServiceConfig):
-            return AudioService(conversation_id, audio_service_config, logger=logger)
+            return AudioService(
+                conversation_id, audio_service_config, logger=logger, log_dir=log_dir
+            )
         raise Exception("Invalid audio service config")

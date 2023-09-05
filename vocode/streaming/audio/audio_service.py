@@ -13,13 +13,13 @@ class AudioService(BaseThreadAsyncAudioService[AudioServiceConfig]):
         conversation_id: str,
         audio_service_config: AudioServiceConfig,
         logger: Optional[logging.Logger] = None,
-        log_dir: Optional[str] = None,
     ):
-        super().__init__(conversation_id, audio_service_config, logger, log_dir)
+        super().__init__(conversation_id, audio_service_config, logger)
 
     def process(self, chunk: bytes) -> bytes:
         """No processing"""
-        self.audio += chunk
+        if self.audio_service_config.log_dir:
+            self.audio += chunk
         return chunk
 
     def _run_loop(self):

@@ -1,6 +1,7 @@
 from .audio_encoding import AudioEncoding
 from .model import TypedModel
 from enum import Enum
+from typing import Optional
 
 
 class AudioServiceType(str, Enum):
@@ -14,3 +15,4 @@ class AudioServiceConfig(TypedModel, type=AudioServiceType.BASE.value):
 
     sampling_rate: int
     audio_encoding: AudioEncoding
+    log_dir: Optional[str] = None

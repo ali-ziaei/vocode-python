@@ -61,7 +61,6 @@ class BaseThreadAsyncAudioService(
         conversation_id: str,
         audio_service_config: AudioServiceConfigType,
         logger: Optional[logging.Logger] = None,
-        log_dir: Optional[str] = None,
     ):
         self.conversation_id = conversation_id
         self.is_muted = False
@@ -71,9 +70,8 @@ class BaseThreadAsyncAudioService(
         ThreadAsyncWorker.__init__(self, self.input_queue, self.output_queue)
         AbstractAudioService.__init__(self, audio_service_config)
         self.logger = logger
-        self.log_dir = log_dir
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
+        if self.audio_service_config.log_dir:
+            os.makedirs(self.audio_service_config.log_dir, exist_ok=True)
         self.audio = b""
 
     def process(self, chunk: bytes) -> bytes:
@@ -112,12 +110,15 @@ class BaseThreadAsyncAudioService(
 
     def terminate(self):
         self._ended = True
-        if self.log_dir:
+        if self.audio_service_config.log_dir:
             if self.audio_service_config.audio_encoding == AudioEncoding.MULAW:
                 audio = audioop.ulaw2lin(self.audio, 2)
             audio = np.frombuffer(audio, dtype=np.int16)
             soundfile.write(
-                os.path.join(f"{self.log_dir}", self.conversation_id + ".flac"),
+                os.path.join(
+                    f"{self.audio_service_config.log_dir}",
+                    self.conversation_id + ".flac",
+                ),
                 audio,
                 self.audio_service_config.sampling_rate,
             )

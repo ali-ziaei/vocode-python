@@ -1,7 +1,6 @@
 from .audio_encoding import AudioEncoding
 from .model import TypedModel
 from enum import Enum
-from typing import Optional
 
 
 class AudioServiceType(str, Enum):

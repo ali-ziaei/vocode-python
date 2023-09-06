@@ -73,6 +73,27 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         else:
             speech_params["language"] = self.transcriber_config.language
 
+        if transcriber_config.stable_partial_result_threshold:
+            speech_config.set_property(
+                property_id=speechsdk.PropertyId.SpeechServiceResponse_StablePartialResultThreshold,  # pylint: disable=line-too-long
+                value=str(self.transcriber_config.stable_partial_result_threshold),
+            )
+
+        if transcriber_config.segmentation_sil_timeout:
+            speech_config.set_property(
+                property_id=speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,
+                value=str(self.transcriber_config.segmentation_sil_timeout),
+            )
+
+        if transcriber_config.end_sil_timeout:
+            speech_config.set_property(
+                property_id=speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,  # pylint: disable=line-too-long
+                value=str(self.transcriber_config.end_sil_timeout),
+            )
+
+        if transcriber_config.enable_dictation:
+            speech_config.enable_dictation()
+
         self.speech = speechsdk.SpeechRecognizer(**speech_params)
 
         if transcriber_config.phrases:

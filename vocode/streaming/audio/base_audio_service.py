@@ -3,12 +3,10 @@ from typing import Optional
 import asyncio
 import queue
 import audioop
-
 from typing import TypeVar, Generic
 from vocode.streaming.utils.worker import ThreadAsyncWorker
 from vocode.streaming.models.audio_encoding import AudioEncoding
 from vocode.streaming.models.audio import AudioServiceConfig
-
 
 AudioServiceConfigType = TypeVar("AudioServiceConfigType", bound=AudioServiceConfig)
 

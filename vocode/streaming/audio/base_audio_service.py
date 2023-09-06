@@ -2,14 +2,11 @@ import logging
 from typing import Optional
 import asyncio
 import queue
-import os
 import audioop
-import soundfile
 from typing import TypeVar, Generic
 from vocode.streaming.utils.worker import ThreadAsyncWorker
 from vocode.streaming.models.audio_encoding import AudioEncoding
 from vocode.streaming.models.audio import AudioServiceConfig
-import numpy as np
 
 AudioServiceConfigType = TypeVar("AudioServiceConfigType", bound=AudioServiceConfig)
 
@@ -70,9 +67,6 @@ class BaseThreadAsyncAudioService(
         ThreadAsyncWorker.__init__(self, self.input_queue, self.output_queue)
         AbstractAudioService.__init__(self, audio_service_config)
         self.logger = logger
-        if self.audio_service_config.log_dir:
-            os.makedirs(self.audio_service_config.log_dir, exist_ok=True)
-        self.audio = b""
 
     def process(self, chunk: bytes) -> bytes:
         raise NotImplementedError
@@ -110,17 +104,4 @@ class BaseThreadAsyncAudioService(
 
     def terminate(self):
         self._ended = True
-        if self.audio_service_config.log_dir:
-            if self.audio_service_config.audio_encoding == AudioEncoding.MULAW:
-                audio = audioop.ulaw2lin(self.audio, 2)
-            audio = np.frombuffer(audio, dtype=np.int16)
-            soundfile.write(
-                os.path.join(
-                    f"{self.audio_service_config.log_dir}",
-                    self.conversation_id + ".flac",
-                ),
-                audio,
-                self.audio_service_config.sampling_rate,
-            )
-
         ThreadAsyncWorker.terminate(self)

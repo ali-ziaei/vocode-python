@@ -15,4 +15,3 @@ class AudioServiceConfig(TypedModel, type=AudioServiceType.BASE.value):
 
     sampling_rate: int
     audio_encoding: AudioEncoding
-    log_dir: Optional[str] = None

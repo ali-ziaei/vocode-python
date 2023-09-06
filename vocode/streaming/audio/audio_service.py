@@ -18,8 +18,6 @@ class AudioService(BaseThreadAsyncAudioService[AudioServiceConfig]):
 
     def process(self, chunk: bytes) -> bytes:
         """No processing"""
-        if self.audio_service_config.log_dir:
-            self.audio += chunk
         return chunk
 
     def _run_loop(self):

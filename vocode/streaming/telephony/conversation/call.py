@@ -1,32 +1,29 @@
-from fastapi import WebSocket
-from enum import Enum
 import logging
+import os
+from enum import Enum
 from typing import Optional, TypeVar, Union
-from vocode.streaming.agent.factory import AgentFactory
-from vocode.streaming.models.agent import AgentConfig
-from vocode.streaming.models.events import PhoneCallEndedEvent
-from vocode.streaming.output_device.vonage_output_device import VonageOutputDevice
 
-from vocode.streaming.streaming_conversation import StreamingConversation
+from fastapi import WebSocket
+from pythonjsonlogger import jsonlogger  # type: ignore
+from vocode.streaming.agent.factory import AgentFactory
+from vocode.streaming.audio.factory import AudioServiceFactory
+from vocode.streaming.models.agent import AgentConfig
+from vocode.streaming.models.audio import AudioServiceConfig
+from vocode.streaming.models.events import PhoneCallEndedEvent
+from vocode.streaming.models.synthesizer import SynthesizerConfig
+from vocode.streaming.models.transcriber import TranscriberConfig
 from vocode.streaming.output_device.twilio_output_device import TwilioOutputDevice
-from vocode.streaming.models.synthesizer import (
-    SynthesizerConfig,
-)
-from vocode.streaming.models.transcriber import (
-    TranscriberConfig,
-)
+from vocode.streaming.output_device.vonage_output_device import VonageOutputDevice
+from vocode.streaming.streaming_conversation import StreamingConversation
 from vocode.streaming.synthesizer.factory import SynthesizerFactory
 from vocode.streaming.telephony.config_manager.base_config_manager import (
     BaseConfigManager,
 )
 from vocode.streaming.telephony.constants import DEFAULT_SAMPLING_RATE
-from vocode.streaming.streaming_conversation import StreamingConversation
 from vocode.streaming.transcriber.factory import TranscriberFactory
-from vocode.streaming.utils.events_manager import EventsManager
-from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
 from vocode.streaming.utils import create_conversation_id
-from vocode.streaming.models.audio import AudioServiceConfig
-from vocode.streaming.audio.factory import AudioServiceFactory
+from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
+from vocode.streaming.utils.events_manager import EventsManager
 
 TelephonyOutputDeviceType = TypeVar(
     "TelephonyOutputDeviceType", bound=Union[TwilioOutputDevice, VonageOutputDevice]
@@ -54,7 +51,21 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         logger: Optional[logging.Logger] = None,
     ):
         conversation_id = conversation_id or create_conversation_id()
-        logger = wrap_logger(
+
+        if events_manager and events_manager.log_dir:
+            os.makedirs(events_manager.log_dir, exist_ok=True)
+            format_str = "%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s"
+            logFormatter = logging.Formatter(fmt=format_str)
+
+            log_file = os.path.join(
+                events_manager.log_dir, conversation_id + ".log.json"
+            )
+            file_handler = logging.FileHandler(log_file)
+            formatter = jsonlogger.JsonFormatter(format_str)
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+
+        self.logger = wrap_logger(
             logger or logging.getLogger(__name__),
             conversation_id=conversation_id,
         )
@@ -66,15 +77,19 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         super().__init__(
             output_device,
             audio_service_factory.create_audio_service(
-                conversation_id, audio_service_config, logger=logger
+                conversation_id, audio_service_config, logger=self.logger
             ),
-            transcriber_factory.create_transcriber(transcriber_config, logger=logger),
-            agent_factory.create_agent(agent_config, logger=logger),
-            synthesizer_factory.create_synthesizer(synthesizer_config, logger=logger),
+            transcriber_factory.create_transcriber(
+                transcriber_config, logger=self.logger
+            ),
+            agent_factory.create_agent(agent_config, logger=self.logger),
+            synthesizer_factory.create_synthesizer(
+                synthesizer_config, logger=self.logger
+            ),
             conversation_id=conversation_id,
             per_chunk_allowance_seconds=0.01,
             events_manager=events_manager,
-            logger=logger,
+            logger=self.logger,
         )
 
     def attach_ws(self, ws: WebSocket):

@@ -125,6 +125,13 @@ class AzureTranscriberConfig(TranscriberConfig, type=TranscriberType.AZURE.value
     language: str = AZURE_DEFAULT_LANGUAGE
     candidate_languages: Optional[List[str]] = None
     phrases: Optional[List[str]] = None
+    stable_partial_result_threshold: Optional[int] = None
+    segmentation_sil_timeout: Optional[
+        int
+    ] = None  # (between 100 and 5000) milliseconds
+    initial_sil_timeout: Optional[int] = None  # (between 0 and inf) milliseconds
+    end_sil_timeout: Optional[int] = None  # (between 0 and inf) milliseconds
+    enable_dictation: Optional[bool] = None
 
 
 class AssemblyAITranscriberConfig(

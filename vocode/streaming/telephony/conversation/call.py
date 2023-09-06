@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Optional, TypeVar, Union
 
 from fastapi import WebSocket
+from pythonjsonlogger import jsonlogger  # type: ignore
 from vocode.streaming.agent.factory import AgentFactory
 from vocode.streaming.audio.factory import AudioServiceFactory
 from vocode.streaming.models.agent import AgentConfig
@@ -53,13 +54,15 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
 
         if events_manager and events_manager.log_dir:
             os.makedirs(events_manager.log_dir, exist_ok=True)
-            logFormatter = logging.Formatter(
-                fmt="%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s"
-            )
+            format_str = "%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s"
+            logFormatter = logging.Formatter(fmt=format_str)
 
-            log_file = os.path.join(events_manager.log_dir, conversation_id + ".log")
+            log_file = os.path.join(
+                events_manager.log_dir, conversation_id + ".log.json"
+            )
             file_handler = logging.FileHandler(log_file)
-            file_handler.setFormatter(logFormatter)
+            formatter = jsonlogger.JsonFormatter(format_str)
+            file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
 
         self.logger = wrap_logger(

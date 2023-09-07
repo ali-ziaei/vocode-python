@@ -670,6 +670,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     started_event.set()
             self.output_device.consume_nonblocking(chunk_result.chunk)
             end_time = time.time()
+
+            self.logger.debug(
+                "Sent chunk {} with size {}".format(chunk_idx, len(chunk_result.chunk))
+            )
             await asyncio.sleep(
                 max(
                     speech_length_seconds
@@ -677,9 +681,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     - self.per_chunk_allowance_seconds,
                     0,
                 )
-            )
-            self.logger.debug(
-                "Sent chunk {} with size {}".format(chunk_idx, len(chunk_result.chunk))
             )
             self.mark_last_action_timestamp()
             chunk_idx += 1

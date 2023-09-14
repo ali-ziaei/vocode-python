@@ -1,9 +1,12 @@
+import os
 from cachetools import LRUCache
 from redis import Redis
 
 
 class RedisRenewableTTLCache:
-    _redis_client = Redis(host="localhost", port=6379, db=0)
+    _redis_client = Redis(
+        host=os.environ.get("REDISHOST", "localhost"),
+        port=int(os.environ.get("REDISPORT", 6379)))
     _lru_cache = LRUCache(maxsize=2048)
     _ttl_in_seconds = 60 * 60 * 24
 

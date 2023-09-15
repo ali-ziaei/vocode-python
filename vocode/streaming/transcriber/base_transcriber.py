@@ -23,8 +23,8 @@ class Transcription(BaseModel):
     is_final: bool
     is_interrupt: bool = False
     generated_at: Optional[str] = None
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
     latency: Optional[float] = None
 
     def __str__(self):

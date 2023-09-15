@@ -139,12 +139,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
             if transcription.is_final:
                 self.conversation.logger.debug(
-                    "Got transcription: {}, confidence: {}, generated_at: {}, start_time_from_audio: {}, end_time_from_audio: {}, latency: {}".format(
+                    "Got transcription: {}, confidence: {}, generated_at: {}, start_time: {}, end_time: {}, latency: {}".format(
                         transcription.message,
                         transcription.confidence,
                         transcription.generated_at,
-                        transcription.start_time_from_audio,
-                        transcription.end_time_from_audio,
+                        transcription.start_time,
+                        transcription.end_time,
                         transcription.latency,
                     )
                 )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import audioop
+import datetime
 from typing import Optional
 from opentelemetry import trace, metrics
 from typing import Generic, TypeVar, Union
@@ -22,8 +23,8 @@ class Transcription(BaseModel):
     is_final: bool
     is_interrupt: bool = False
     generated_at: Optional[str] = None
-    start_time_from_audio: Optional[float] = None
-    end_time_from_audio: Optional[float] = None
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
     latency: Optional[float] = None
 
     def __str__(self):
@@ -37,6 +38,7 @@ class AbstractTranscriber(Generic[TranscriberConfigType]):
     def __init__(self, transcriber_config: TranscriberConfigType):
         self.transcriber_config = transcriber_config
         self.is_muted = False
+        self.tic_time: datetime.datetime = datetime.datetime.utcnow()
 
     def mute(self):
         self.is_muted = True

@@ -4,6 +4,7 @@ import base64
 from enum import Enum
 import json
 import logging
+import datetime
 from typing import Optional
 from vocode import getenv
 from vocode.streaming.agent.factory import AgentFactory
@@ -158,6 +159,7 @@ class TwilioCall(Call[TwilioOutputDevice]):
                 self.logger.debug(f"Filling {bytes_to_fill} bytes of silence")
                 # NOTE: 0xff is silence for mulaw audio
                 self.audio_service.send_audio(b"\xff" * bytes_to_fill)
+                self.transcriber.tic_time = datetime.datetime.utcnow()
             self.latest_media_timestamp = int(media["timestamp"])
             self.audio_service.send_audio(chunk)
         elif data["event"] == "stop":

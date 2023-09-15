@@ -106,22 +106,26 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self.is_ready = False
 
     def recognized_sentence_final(self, evt):
+        current_time = datetime.datetime.utcnow()
+        start_time = self.tic_time + datetime.timedelta(seconds=evt.result.offset / 1e7)
+        end_time = start_time + datetime.timedelta(seconds=(evt.result.duration) / 1e7)
+        latency = float(
+            int(
+                evt.result.properties[
+                    speechsdk.PropertyId.SpeechServiceResponse_RecognitionLatencyMs
+                ]
+            )
+            / 1000
+        )
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=True,
-                generated_at=str(datetime.datetime.now()),
-                start_time_from_audio=evt.result.offset / 1e7,
-                end_time_from_audio=(evt.result.offset + evt.result.duration) / 1e7,
-                latency=str(
-                    int(
-                        evt.result.properties[
-                            speechsdk.PropertyId.SpeechServiceResponse_RecognitionLatencyMs
-                        ]
-                    )
-                    / 1000
-                ),
+                generated_at=str(current_time),
+                start_time=str(start_time),
+                end_time=str(end_time),
+                latency=latency,
             )
         )
 

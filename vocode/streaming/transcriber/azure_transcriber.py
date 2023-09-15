@@ -1,7 +1,7 @@
 import logging
 import queue
 from typing import Optional
-
+import datetime
 from azure.cognitiveservices.speech.audio import (
     PushAudioInputStream,
     AudioStreamFormat,
@@ -16,6 +16,7 @@ from vocode.streaming.transcriber.base_transcriber import (
     Transcription,
 )
 from vocode.streaming.models.transcriber import AzureTranscriberConfig
+import azure.cognitiveservices.speech as speechsdk
 
 
 class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
@@ -39,8 +40,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
                 samples_per_second=self.transcriber_config.sampling_rate,
                 wave_stream_format=AudioStreamWaveFormat.MULAW,
             )
-
-        import azure.cognitiveservices.speech as speechsdk
 
         self.push_stream = PushAudioInputStream(format)
 
@@ -108,7 +107,22 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
 
     def recognized_sentence_final(self, evt):
         self.output_janus_queue.sync_q.put_nowait(
-            Transcription(message=evt.result.text, confidence=1.0, is_final=True)
+            Transcription(
+                message=evt.result.text,
+                confidence=1.0,
+                is_final=True,
+                generated_at=str(datetime.datetime.now()),
+                start_time_from_audio=evt.result.offset / 1e7,
+                end_time_from_audio=(evt.result.offset + evt.result.duration) / 1e7,
+                latency=str(
+                    int(
+                        evt.result.properties[
+                            speechsdk.PropertyId.SpeechServiceResponse_RecognitionLatencyMs
+                        ]
+                    )
+                    / 1000
+                ),
+            )
         )
 
     def recognized_sentence_stream(self, evt):

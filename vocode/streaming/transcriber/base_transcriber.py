@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import audioop
+from typing import Optional
 from opentelemetry import trace, metrics
 from typing import Generic, TypeVar, Union
 from vocode.streaming.models.audio_encoding import AudioEncoding
@@ -14,11 +15,16 @@ from vocode.streaming.utils.worker import AsyncWorker, ThreadAsyncWorker
 tracer = trace.get_tracer(__name__)
 meter = metrics.get_meter(__name__)
 
+
 class Transcription(BaseModel):
     message: str
     confidence: float
     is_final: bool
     is_interrupt: bool = False
+    generated_at: Optional[str] = None
+    start_time_from_audio: Optional[float] = None
+    end_time_from_audio: Optional[float] = None
+    latency: Optional[float] = None
 
     def __str__(self):
         return f"Transcription({self.message}, {self.confidence}, {self.is_final})"

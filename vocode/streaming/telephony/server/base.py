@@ -158,7 +158,7 @@ class TelephonyServer:
 
             if self.events_manager and self.events_manager.log_dir:
                 os.makedirs(self.events_manager.log_dir, exist_ok=True)
-                format_str: str = "%(asctime)s [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
+                format_str: str = "%(asctime)s.%(msecs)03d [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
                 log_file = os.path.join(
                     self.events_manager.log_dir, conversation_id + ".log.json"
                 )

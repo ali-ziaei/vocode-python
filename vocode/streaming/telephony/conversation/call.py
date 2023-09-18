@@ -49,6 +49,7 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         logger: Optional[logging.Logger] = None,
     ):
         conversation_id = conversation_id or create_conversation_id()
+        self.logger = logger
 
         self.from_phone = from_phone
         self.to_phone = to_phone

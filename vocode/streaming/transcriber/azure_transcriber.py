@@ -130,6 +130,27 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         )
 
     def recognized_sentence_stream(self, evt):
+        current_time = datetime.datetime.utcnow()
+        start_time = self.tic_time + datetime.timedelta(seconds=evt.result.offset / 1e7)
+        end_time = start_time + datetime.timedelta(seconds=(evt.result.duration) / 1e7)
+        latency = float(
+            int(
+                evt.result.properties[
+                    speechsdk.PropertyId.SpeechServiceResponse_RecognitionLatencyMs
+                ]
+            )
+            / 1000
+        )
+        self.logger.debug(
+            "Got Partial transcription: {}, generated_at: {}, start_time: {}, end_time: {}, latency: {}".format(
+                evt.result.text,
+                str(current_time),
+                str(start_time),
+                str(end_time),
+                latency,
+            )
+        )
+
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(message=evt.result.text, confidence=1.0, is_final=False)
         )

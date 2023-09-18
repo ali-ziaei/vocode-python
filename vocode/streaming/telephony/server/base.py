@@ -1,6 +1,10 @@
 import abc
 from functools import partial
 import logging
+import os
+from pythonjsonlogger import jsonlogger  # type: ignore
+from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
+
 from typing import List, Optional
 from fastapi import APIRouter, Form, Request, Response
 from pydantic import BaseModel, Field
@@ -150,6 +154,22 @@ class TelephonyServer:
             )
 
             conversation_id = create_conversation_id()
+
+            if self.events_manager and self.events_manager.log_dir:
+                os.makedirs(self.events_manager.log_dir, exist_ok=True)
+                format_str: str = "%(asctime)s [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
+                log_file = os.path.join(
+                    self.events_manager.log_dir, conversation_id + ".log.json"
+                )
+                file_handler = logging.FileHandler(log_file)
+                formatter = jsonlogger.JsonFormatter(format_str)
+                file_handler.setFormatter(formatter)
+                self.logger.addHandler(file_handler)
+
+            self.logger = wrap_logger(
+                self.logger or logging.getLogger(__name__),
+                conversation_id=conversation_id,
+            )
             await self.config_manager.save_config(conversation_id, call_config)
             return self.templater.get_connection_twiml(
                 base_url=self.base_url, call_id=conversation_id

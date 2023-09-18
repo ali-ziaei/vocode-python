@@ -4,7 +4,6 @@ from enum import Enum
 from typing import Optional, TypeVar, Union
 
 from fastapi import WebSocket
-from pythonjsonlogger import jsonlogger  # type: ignore
 from vocode.streaming.agent.factory import AgentFactory
 from vocode.streaming.audio.factory import AudioServiceFactory
 from vocode.streaming.models.agent import AgentConfig
@@ -22,7 +21,6 @@ from vocode.streaming.telephony.config_manager.base_config_manager import (
 from vocode.streaming.telephony.constants import DEFAULT_SAMPLING_RATE
 from vocode.streaming.transcriber.factory import TranscriberFactory
 from vocode.streaming.utils import create_conversation_id
-from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
 from vocode.streaming.utils.events_manager import EventsManager
 
 TelephonyOutputDeviceType = TypeVar(
@@ -51,24 +49,6 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         logger: Optional[logging.Logger] = None,
     ):
         conversation_id = conversation_id or create_conversation_id()
-
-        if events_manager and events_manager.log_dir:
-            os.makedirs(events_manager.log_dir, exist_ok=True)
-            format_str: str = (
-                "%(asctime)s [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
-            )
-            log_file = os.path.join(
-                events_manager.log_dir, conversation_id + ".log.json"
-            )
-            file_handler = logging.FileHandler(log_file)
-            formatter = jsonlogger.JsonFormatter(format_str)
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-
-        self.logger = wrap_logger(
-            logger or logging.getLogger(__name__),
-            conversation_id=conversation_id,
-        )
 
         self.from_phone = from_phone
         self.to_phone = to_phone

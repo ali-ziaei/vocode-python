@@ -164,7 +164,7 @@ class TelephonyServer:
                 )
                 file_handler = logging.FileHandler(log_file)
                 formatter = jsonlogger.JsonFormatter(
-                    format_str, datefmt="%Y-%m-%d %H:%M:%S.%f"
+                    format_str, datefmt="%Y-%m-%d %H:%M:%S"
                 )
                 formatter.converter = time.gmtime
                 file_handler.setFormatter(formatter)

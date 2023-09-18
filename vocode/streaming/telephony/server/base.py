@@ -2,6 +2,7 @@ import abc
 from functools import partial
 import logging
 import os
+import time
 from pythonjsonlogger import jsonlogger  # type: ignore
 from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
 
@@ -162,14 +163,19 @@ class TelephonyServer:
                     self.events_manager.log_dir, conversation_id + ".log.json"
                 )
                 file_handler = logging.FileHandler(log_file)
-                formatter = jsonlogger.JsonFormatter(format_str)
+                formatter = jsonlogger.JsonFormatter(
+                    format_str, datefmt="%Y-%m-%d %H:%M:%S"
+                )
+                formatter.converter = time.gmtime
                 file_handler.setFormatter(formatter)
+                file_handler.setLevel(logging.DEBUG)
                 self.logger.addHandler(file_handler)
 
             self.logger = wrap_logger(
                 self.logger or logging.getLogger(__name__),
                 conversation_id=conversation_id,
             )
+
             await self.config_manager.save_config(conversation_id, call_config)
             return self.templater.get_connection_twiml(
                 base_url=self.base_url, call_id=conversation_id

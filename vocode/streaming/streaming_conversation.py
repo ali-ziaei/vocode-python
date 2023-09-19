@@ -686,7 +686,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 "Sent chunk {} with size {} for {}".format(
                     chunk_idx,
                     len(chunk_result.chunk),
-                    synthesis_result.get_message_up_to(seconds_spoken),
+                    message_sent,
                 )
             )
             await asyncio.sleep(

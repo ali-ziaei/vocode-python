@@ -683,7 +683,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
             end_time = time.time()
 
             self.logger.debug(
-                "Sent chunk {} with size {}".format(chunk_idx, len(chunk_result.chunk))
+                "Sent chunk {} with size {} for {}".format(
+                    chunk_idx,
+                    len(chunk_result.chunk),
+                    synthesis_result.get_message_up_to(seconds_spoken),
+                )
             )
             await asyncio.sleep(
                 max(

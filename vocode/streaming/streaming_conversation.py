@@ -137,17 +137,23 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if transcription.message.strip() == "":
                 self.conversation.logger.info("Ignoring empty transcription")
                 return
-            if transcription.is_final:
-                self.conversation.logger.debug(
-                    "Got transcription: {}, confidence: {}, generated_at: {}, start_time: {}, end_time: {}, latency: {}".format(
-                        transcription.message,
-                        transcription.confidence,
-                        transcription.generated_at,
-                        transcription.start_time,
-                        transcription.end_time,
-                        transcription.latency,
-                    )
+
+            initial_part_of_message = (
+                "Got final transcription:"
+                if transcription.is_final
+                else "Got partial transcription:"
+            )
+            self.conversation.logger.debug(
+                "{} {}, confidence: {}, generated_at: {}, start_time: {}, end_time: {}, latency: {}".format(
+                    initial_part_of_message,
+                    transcription.message,
+                    transcription.confidence,
+                    transcription.generated_at,
+                    transcription.start_time,
+                    transcription.end_time,
+                    transcription.latency,
                 )
+            )
             if (
                 not self.conversation.is_human_speaking
                 and self.conversation.is_interrupt(transcription)

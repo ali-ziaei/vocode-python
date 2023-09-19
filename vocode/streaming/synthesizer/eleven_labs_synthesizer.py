@@ -65,7 +65,6 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 stability=self.stability, similarity_boost=self.similarity_boost
             )
 
-        self.logger.debug(f'Synthesizing message: "{message.text}"')
         cache_key = self.get_cache_key(message.text)
         audio_data = self.cache.get(cache_key)
         if audio_data is not None:

@@ -1,6 +1,9 @@
 import logging
 from typing import Optional
-
+import audioop
+import soundfile
+import numpy as np
+import os
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioService
 
@@ -18,6 +21,7 @@ class AudioService(BaseThreadAsyncAudioService[AudioServiceConfig]):
 
     def process(self, chunk: bytes) -> bytes:
         """No processing"""
+        self._audio += audioop.ulaw2lin(chunk, 2)
         return chunk
 
     def _run_loop(self):
@@ -28,4 +32,15 @@ class AudioService(BaseThreadAsyncAudioService[AudioServiceConfig]):
             self.output_janus_queue.sync_q.put_nowait(processed_chunk)
 
             if self._ended:
+                if self._audio and self.audio_service_config.log_dir:
+                    os.makedirs(self.audio_service_config.log_dir, exist_ok=True)
+                    data = np.frombuffer(self._audio, dtype=np.int16)
+                    soundfile.write(
+                        os.path.join(
+                            self.audio_service_config.log_dir,
+                            self.conversation_id + ".flac",
+                        ),
+                        data,
+                        8000,
+                    )
                 break

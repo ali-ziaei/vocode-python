@@ -67,6 +67,7 @@ class BaseThreadAsyncAudioService(
         ThreadAsyncWorker.__init__(self, self.input_queue, self.output_queue)
         AbstractAudioService.__init__(self, audio_service_config)
         self.logger = logger
+        self._audio = b""
 
     def process(self, chunk: bytes) -> bytes:
         raise NotImplementedError

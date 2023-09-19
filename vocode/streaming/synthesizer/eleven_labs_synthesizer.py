@@ -68,7 +68,9 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         cache_key = self.get_cache_key(message.text)
         audio_data = self.cache.get(cache_key)
         if audio_data is None:
-            self.logger.debug("Synthesizing message - message not found in cache")
+            self.logger.debug(
+                f'Synthesizing message: "{message.text}" - message not found in cache'
+            )
 
             url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
             if self.experimental_streaming:
@@ -101,6 +103,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 raise Exception(
                     f"ElevenLabs API returned {response.status} status code"
                 )
+
+            self.logger.debug(f'"{message.text}" Synthesized! (eleven labs API call)')
 
             if self.experimental_streaming:
                 return SynthesisResult(

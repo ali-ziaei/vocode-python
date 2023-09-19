@@ -122,7 +122,7 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=is_final,
-                final_generated_at=str(current_time),
+                generated_at=str(current_time),
                 start_time=str(start_time),
                 end_time=str(end_time),
                 latency=latency,

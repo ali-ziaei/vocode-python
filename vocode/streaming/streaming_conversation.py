@@ -683,7 +683,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             end_time = time.time()
 
             self.logger.debug(
-                "Sent chunk {} with size {} for {}".format(
+                'Sent chunk {} with size {} for "{}"'.format(
                     chunk_idx,
                     len(chunk_result.chunk),
                     message_sent,

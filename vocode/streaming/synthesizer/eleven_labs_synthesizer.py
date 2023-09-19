@@ -67,7 +67,11 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
         cache_key = self.get_cache_key(message.text)
         audio_data = self.cache.get(cache_key)
-        if audio_data is None:
+        if audio_data is not None:
+            self.logger.debug(
+                f'Synthesizing message: "{message.text}" - message found in cache'
+            )
+        else:
             self.logger.debug(
                 f'Synthesizing message: "{message.text}" - message not found in cache'
             )

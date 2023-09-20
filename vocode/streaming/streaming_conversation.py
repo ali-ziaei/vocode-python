@@ -323,9 +323,17 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     ):
                         await self.conversation.filler_audio_worker.wait_for_filler_audio_to_finish()
 
-                self.conversation.logger.debug(
-                    f"Synthesizing speech for message: {agent_response_message.message}"
+                tts_log = TTSLog(
+                    conversation_id="",
+                    message="TTS: Synthesizing speech.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.TTS,
+                    text=agent_response_message.message,
+                    start_time=datetime.datetime.utcnow(),
+                    end_time=datetime.datetime.utcnow(),
                 )
+                self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
+
                 synthesis_result = await self.conversation.synthesizer.create_speech(
                     agent_response_message.message,
                     self.chunk_size,

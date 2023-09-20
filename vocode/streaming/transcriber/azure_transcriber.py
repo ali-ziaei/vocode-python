@@ -7,6 +7,7 @@ from azure.cognitiveservices.speech.audio import (
     AudioStreamFormat,
     AudioStreamWaveFormat,
 )
+import datetime
 
 from vocode import getenv
 
@@ -26,6 +27,7 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
     ):
         super().__init__(transcriber_config)
         self.logger = logger
+        self.initial_time: Optional[datetime.datetime] = None
 
         format = None
         if self.transcriber_config.audio_encoding == AudioEncoding.LINEAR16:
@@ -106,14 +108,40 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self._ended = False
         self.is_ready = False
 
+    def _get_start_end(self, evt):
+        start_time = None
+        end_time = None
+        if self.initial_time:
+            start_time = self.initial_time + datetime.timedelta(
+                seconds=evt.result.offset / 1e7
+            )
+            end_time = start_time + datetime.timedelta(
+                seconds=evt.result.duration / 1e7
+            )
+        return start_time, end_time
+
     def recognized_sentence_final(self, evt):
+        start_time, end_time = self._get_start_end(evt)
         self.output_janus_queue.sync_q.put_nowait(
-            Transcription(message=evt.result.text, confidence=1.0, is_final=True)
+            Transcription(
+                message=evt.result.text,
+                confidence=1.0,
+                is_final=True,
+                start_time=start_time,
+                end_time=end_time,
+            )
         )
 
     def recognized_sentence_stream(self, evt):
+        start_time, end_time = self._get_start_end(evt)
         self.output_janus_queue.sync_q.put_nowait(
-            Transcription(message=evt.result.text, confidence=1.0, is_final=False)
+            Transcription(
+                message=evt.result.text,
+                confidence=1.0,
+                is_final=False,
+                start_time=start_time,
+                end_time=end_time,
+            )
         )
 
     def _run_loop(self):
@@ -157,6 +185,10 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
 
             if chunk is None:
                 return
+
+            if self.initial_time is None:
+                self.initial_time = datetime.datetime.utcnow()
+
             data = [chunk]
 
             # Now consume whatever other data's still buffered.
@@ -173,5 +205,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
 
     def terminate(self):
         self._ended = True
+        self.initial_time = None
         self.speech.stop_continuous_recognition_async()
         super().terminate()

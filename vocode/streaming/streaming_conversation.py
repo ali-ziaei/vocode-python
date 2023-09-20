@@ -328,7 +328,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="TTS: Synthesizing speech.",
                     time_stamp=datetime.datetime.utcnow(),
                     log_type=LogType.TTS,
-                    text=agent_response_message.message,
+                    text=agent_response_message.message.text,
                     start_time=datetime.datetime.utcnow(),
                     end_time=datetime.datetime.utcnow(),
                 )

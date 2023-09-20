@@ -139,8 +139,20 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
             if transcription.is_final:
                 self.conversation.logger.debug(
-                    "Got transcription: {}, confidence: {}".format(
-                        transcription.message, transcription.confidence
+                    "ASR: Final transcription: {}, confidence: {}, start_time: {}, end_time: {}".format(
+                        transcription.message,
+                        transcription.confidence,
+                        transcription.start_time,
+                        transcription.end_time,
+                    )
+                )
+            else:
+                self.conversation.logger.debug(
+                    "ASR: Partial transcription: {}, confidence: {}, start_time: {}, end_time: {}".format(
+                        transcription.message,
+                        transcription.confidence,
+                        transcription.start_time,
+                        transcription.end_time,
                     )
                 )
             if (

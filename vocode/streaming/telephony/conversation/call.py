@@ -2,7 +2,7 @@ import logging
 import os
 from enum import Enum
 from typing import Optional, TypeVar, Union
-
+import time
 from fastapi import WebSocket
 from pythonjsonlogger import jsonlogger  # type: ignore
 from vocode.streaming.agent.factory import AgentFactory
@@ -52,16 +52,16 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
     ):
         conversation_id = conversation_id or create_conversation_id()
 
-        if events_manager and events_manager.log_dir:
+        if logger and events_manager and events_manager.log_dir:
             os.makedirs(events_manager.log_dir, exist_ok=True)
-            format_str: str = (
-                "%(asctime)s [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
-            )
+            format_str: str = "%(asctime)s.%03d [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
             log_file = os.path.join(
                 events_manager.log_dir, conversation_id + ".log.json"
             )
             file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(logging.DEBUG)
             formatter = jsonlogger.JsonFormatter(format_str)
+            formatter.converter = time.gmtime
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
 

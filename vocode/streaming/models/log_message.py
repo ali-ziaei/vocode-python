@@ -2,13 +2,14 @@ import datetime
 from dataclasses import dataclass
 from mashumaro import DataClassDictMixin
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, Dict
 
 
 class LogType(Enum):
     BASE = "base"
     AUDIO = "audio"
     ASR = "asr"
+    NLU = "nlu"
     TTS = "tts"
 
 
@@ -31,6 +32,15 @@ class ASRLog(BaseLog):
     is_final: str
     start_time: datetime.datetime
     end_time: datetime.datetime
+
+
+@dataclass
+class NLULog(BaseLog):
+    text: Optional[str] = None
+    start_time: Optional[datetime.datetime] = None
+    end_time: Optional[datetime.datetime] = None
+    slot_dict: Optional[Dict] = None
+    action_dict: Optional[Dict] = None
 
 
 @dataclass

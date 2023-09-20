@@ -41,6 +41,8 @@ class NLULog(BaseLog):
     end_time: Optional[datetime.datetime] = None
     slot_dict: Optional[Dict] = None
     action_dict: Optional[Dict] = None
+    current_task: Optional[str] = None
+    is_final: Optional[bool] = None
 
 
 @dataclass

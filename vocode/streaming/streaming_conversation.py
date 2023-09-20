@@ -164,7 +164,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 if self.conversation.current_transcription_is_interrupt:
                     self.conversation.logger.debug("sending interrupt")
-                self.conversation.logger.debug("Human started speaking")
+                self.conversation.logger.debug("ASR: Human started speaking")
 
             transcription.is_interrupt = (
                 self.conversation.current_transcription_is_interrupt
@@ -373,7 +373,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                 )
                 item.agent_response_tracker.set()
-                self.conversation.logger.debug("Message sent: {}".format(message_sent))
+                self.conversation.logger.debug(
+                    "TTS: Message sent: {}".format(message_sent)
+                )
                 if cut_off:
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
@@ -670,7 +672,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             seconds_spoken = chunk_idx * seconds_per_chunk
             if stop_event.is_set():
                 self.logger.debug(
-                    "Interrupted, stopping text to speech after {} chunks".format(
+                    "TTS: Interrupted, stopping text to speech after {} chunks".format(
                         chunk_idx
                     )
                 )
@@ -684,7 +686,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
             end_time = time.time()
 
             self.logger.debug(
-                "Sent chunk {} with size {}".format(chunk_idx, len(chunk_result.chunk))
+                'TTS: Sent chunk {} with size {} from message: "{}"'.format(
+                    chunk_idx, len(chunk_result.chunk), message
+                )
             )
             await asyncio.sleep(
                 max(

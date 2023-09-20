@@ -67,8 +67,14 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
         cache_key = self.get_cache_key(message.text)
         audio_data = self.cache.get(cache_key)
-        if audio_data is None:
-            self.logger.debug("Synthesizing message - message not found in cache")
+        if audio_data is not None:
+            self.logger.debug(
+                f'TTS: Synthesizing speech for message: "{message.text}" found in Redis.'
+            )
+        else:
+            self.logger.debug(
+                f'TTS: Synthesizing speech for message: "{message.text}" not found in cache, calling API ...'
+            )
 
             url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
             if self.experimental_streaming:
@@ -101,9 +107,12 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 raise Exception(
                     f"ElevenLabs API returned {response.status} status code"
                 )
+            self.logger.debug(
+                f'TTS: Synthesizing speech for message: "{message.text}" synthesized by calling API.'
+            )
 
             if self.experimental_streaming:
-                return SynthesisResult(
+                synthesis_result = SynthesisResult(
                     self.experimental_mp3_streaming_output_generator(
                         response, chunk_size, create_speech_span, message
                     ),  # should be wav
@@ -111,6 +120,10 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                         message, seconds, self.words_per_minute
                     ),
                 )
+                self.logger.debug(
+                    f'TTS: Synthesizing speech for message: "{message.text}" synthesis_result is ready to return (after calling API).'
+                )
+                return synthesis_result
             else:
                 create_speech_span.end()
                 audio_data = await response.read()
@@ -118,12 +131,16 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
         # Each of the branches below use the cached audio to generate a response
         if self.experimental_streaming:
-            return SynthesisResult(
+            synthesis_result = SynthesisResult(
                 self.cached_chunk_generator(audio_data),
                 lambda seconds: self.get_message_cutoff_from_voice_speed(
                     message, seconds, self.words_per_minute
                 ),
             )
+            self.logger.debug(
+                f'TTS: Synthesizing speech for message: "{message.text}" synthesis_result is ready to return (after getting audio from Redis).'
+            )
+            return synthesis_result
         else:
             convert_span = tracer.start_span(
                 f"synthesizer.{SynthesizerType.ELEVEN_LABS.value.split('_', 1)[-1]}.convert",
@@ -137,5 +154,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 chunk_size=chunk_size,
             )
             convert_span.end()
-
+            self.logger.debug(
+                f'TTS: Synthesizing speech for message: "{message.text}" synthesis_result is ready to return (after getting audio from Redis).'
+            )
             return result

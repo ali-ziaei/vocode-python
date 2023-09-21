@@ -23,7 +23,7 @@ class BaseLog(DataClassDictMixin):
 
 @dataclass
 class AudioLog(BaseLog):
-    pass
+    """Will add details as needed"""
 
 
 @dataclass
@@ -48,6 +48,7 @@ class NLULog(BaseLog):
 @dataclass
 class TTSLog(BaseLog):
     text: str
-    start_time: datetime.datetime
-    end_time: datetime.datetime
+    start_time: Optional[datetime.datetime] = None
+    end_time: Optional[datetime.datetime] = None
     is_cached: Optional[bool] = None
+    is_final: Optional[bool] = None

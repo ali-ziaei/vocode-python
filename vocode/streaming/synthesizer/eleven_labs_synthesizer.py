@@ -70,15 +70,14 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         cache_key = self.get_cache_key(message.text)
         audio_data = self.cache.get(cache_key)
 
+        start_time = datetime.datetime.utcnow()
         if audio_data is not None:
             tts_log = TTSLog(
                 conversation_id="",
-                message="TTS: Synthesizing speech, found in Redis",
+                message="TTS: Synthesizing speech -> found in Redis.",
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message.text,
-                start_time=datetime.datetime.utcnow(),
-                end_time=datetime.datetime.utcnow(),
                 is_cached=True,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
@@ -86,12 +85,10 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         else:
             tts_log = TTSLog(
                 conversation_id="",
-                message="TTS: Synthesizing speech, calling API.",
+                message="TTS: Synthesizing speech -> calling API.",
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message.text,
-                start_time=datetime.datetime.utcnow(),
-                end_time=datetime.datetime.utcnow(),
                 is_cached=False,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
@@ -130,13 +127,13 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
             tts_log = TTSLog(
                 conversation_id="",
-                message="TTS: Synthesizing speech, calling API, done!.",
+                message="TTS: Synthesizing speech, called API -> Got api response.",
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message.text,
-                start_time=datetime.datetime.utcnow(),
-                end_time=datetime.datetime.utcnow(),
                 is_cached=False,
+                start_time=start_time,
+                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -152,11 +149,11 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
                 tts_log = TTSLog(
                     conversation_id="",
-                    message="TTS: Synthesizing speech, calling API, conversion, done!.",
+                    message="TTS: Synthesizing speech, called API, got api response -> Did audio conversion.",
                     time_stamp=datetime.datetime.utcnow(),
                     log_type=LogType.TTS,
                     text=message.text,
-                    start_time=datetime.datetime.utcnow(),
+                    start_time=start_time,
                     end_time=datetime.datetime.utcnow(),
                     is_cached=False,
                 )
@@ -179,11 +176,11 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
             tts_log = TTSLog(
                 conversation_id="",
-                message="TTS: Synthesizing speech, getting from redis, conversion, done!.",
+                message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message.text,
-                start_time=datetime.datetime.utcnow(),
+                start_time=start_time,
                 end_time=datetime.datetime.utcnow(),
                 is_cached=True,
             )
@@ -205,11 +202,11 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             convert_span.end()
             tts_log = TTSLog(
                 conversation_id="",
-                message="TTS: Synthesizing speech, getting from redis, conversion, done!.",
+                message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message.text,
-                start_time=datetime.datetime.utcnow(),
+                start_time=start_time,
                 end_time=datetime.datetime.utcnow(),
                 is_cached=True,
             )

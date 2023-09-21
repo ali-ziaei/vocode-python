@@ -713,7 +713,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
             tts_log = TTSLog(
                 conversation_id=self.id,
-                message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{len(chunk_result.chunk) / self.synthesizer.get_synthesizer_config().sampling_rate}" to output device.',
+                message=f'TTS: Sent chunk "{chunk_idx}" with length (sample): "{len(chunk_result.chunk)}" to output device.',
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message_sent,

@@ -165,6 +165,8 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self.speech.start_continuous_recognition_async()
 
         for content in stream:
+            if self.initial_time is None:
+                self.initial_time = datetime.datetime.utcnow()
             self.push_stream.write(content)
             if self._ended:
                 break
@@ -181,9 +183,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
 
             if chunk is None:
                 return
-
-            if self.initial_time is None:
-                self.initial_time = datetime.datetime.utcnow()
 
             data = [chunk]
 

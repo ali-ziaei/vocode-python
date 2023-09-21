@@ -142,21 +142,17 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if transcription.is_final:
                 is_final = True
                 message = "ASR: Final transcription."
-            # else:
-            #     is_final = False
-            #     message = "ASR: Partial transcription."
-
-            asr_log = ASRLog(
-                conversation_id=self.conversation.id,
-                message=message,
-                time_stamp=datetime.datetime.utcnow(),
-                log_type=LogType.ASR,
-                transcript=transcription.message,
-                is_final=is_final,
-                start_time=transcription.start_time,
-                end_time=transcription.end_time,
-            )
-            self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+                asr_log = ASRLog(
+                    conversation_id=self.conversation.id,
+                    message=message,
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.ASR,
+                    transcript=transcription.message,
+                    is_final=is_final,
+                    start_time=transcription.start_time,
+                    end_time=transcription.end_time,
+                )
+                self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
 
             if (
                 not self.conversation.is_human_speaking

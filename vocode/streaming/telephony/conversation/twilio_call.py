@@ -161,7 +161,7 @@ class TwilioCall(Call[TwilioOutputDevice]):
                 self.logger.debug(f"Filling {bytes_to_fill} bytes of silence")
                 audio_log = AudioLog(
                     conversation_id=self.id,
-                    message="Start sending audio to audio service",
+                    message="Audio: Start sending audio to audio service.",
                     time_stamp=datetime.datetime.utcnow(),
                     log_type=LogType.AUDIO,
                 )

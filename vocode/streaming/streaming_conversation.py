@@ -141,10 +141,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
             if transcription.is_final:
                 is_final = True
-                message = "ASR: Final transcription"
+                message = "ASR: Final transcription."
             else:
                 is_final = False
-                message = "ASR: Partial transcription"
+                message = "ASR: Partial transcription."
 
             asr_log = ASRLog(
                 conversation_id=self.conversation.id,
@@ -329,8 +329,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     time_stamp=datetime.datetime.utcnow(),
                     log_type=LogType.TTS,
                     text=agent_response_message.message.text,
-                    start_time=datetime.datetime.utcnow(),
-                    end_time=datetime.datetime.utcnow(),
                 )
                 self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -391,15 +389,14 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                 )
                 item.agent_response_tracker.set()
-                end_time = datetime.datetime.utcnow()
                 tts_log = TTSLog(
                     conversation_id=self.conversation.id,
-                    message="TTS: Message played back",
+                    message="TTS: Message played back.",
                     time_stamp=datetime.datetime.utcnow(),
                     log_type=LogType.TTS,
                     text=message_sent,
                     start_time=start_time,
-                    end_time=end_time,
+                    end_time=datetime.datetime.utcnow(),
                 )
                 self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
                 if cut_off:
@@ -690,6 +687,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         )
         chunk_idx = 0
         seconds_spoken = 0
+        start_time_and_date = datetime.datetime.utcnow()
         async for chunk_result in synthesis_result.chunk_generator:
             start_time = time.time()
             speech_length_seconds = seconds_per_chunk * (
@@ -700,11 +698,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 message_sent = f"{synthesis_result.get_message_up_to(seconds_spoken)}-"
                 tts_log = TTSLog(
                     conversation_id=self.id,
-                    message="TTS: Interrupted, stopping text to speech!",
+                    message="TTS: Interrupted, stopping text to speech.",
                     time_stamp=datetime.datetime.utcnow(),
                     log_type=LogType.TTS,
                     text=message_sent,
-                    start_time=datetime.datetime.utcnow(),
+                    start_time=start_time_and_date,
                     end_time=datetime.datetime.utcnow(),
                 )
                 self.logger.debug(json.dumps(tts_log.to_dict()))
@@ -719,11 +717,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
             tts_log = TTSLog(
                 conversation_id=self.id,
-                message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{len(chunk_result.chunk) / self.synthesizer.get_synthesizer_config().sampling_rate}" to output device',
+                message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{len(chunk_result.chunk) / self.synthesizer.get_synthesizer_config().sampling_rate}" to output device.',
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message_sent,
-                start_time=datetime.datetime.utcnow(),
+                start_time=start_time_and_date,
                 end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))

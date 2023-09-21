@@ -8,6 +8,7 @@ from azure.cognitiveservices.speech.audio import (
     AudioStreamWaveFormat,
 )
 import datetime
+import azure.cognitiveservices.speech as speechsdk
 
 from vocode import getenv
 
@@ -41,8 +42,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
                 samples_per_second=self.transcriber_config.sampling_rate,
                 wave_stream_format=AudioStreamWaveFormat.MULAW,
             )
-
-        import azure.cognitiveservices.speech as speechsdk
 
         self.push_stream = PushAudioInputStream(format)
 

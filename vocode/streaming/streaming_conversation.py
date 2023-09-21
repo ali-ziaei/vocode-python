@@ -142,9 +142,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if transcription.is_final:
                 is_final = True
                 message = "ASR: Final transcription."
-            else:
-                is_final = False
-                message = "ASR: Partial transcription."
+            # else:
+            #     is_final = False
+            #     message = "ASR: Partial transcription."
 
             asr_log = ASRLog(
                 conversation_id=self.conversation.id,

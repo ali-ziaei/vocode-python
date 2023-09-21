@@ -133,14 +133,11 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         )
 
     def recognized_sentence_stream(self, evt):
-        start_time, end_time = self._get_start_end(evt)
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=False,
-                start_time=start_time,
-                end_time=end_time,
             )
         )
 

@@ -3,6 +3,8 @@ from typing import Optional
 import asyncio
 import queue
 import audioop
+import numpy as np
+import soundfile
 from typing import TypeVar, Generic
 from vocode.streaming.utils.worker import ThreadAsyncWorker
 from vocode.streaming.models.audio_encoding import AudioEncoding
@@ -17,6 +19,7 @@ class AbstractAudioService(Generic[AudioServiceConfigType]):
     def __init__(self, audio_service_config: AudioServiceConfigType):
         self.audio_service_config = audio_service_config
         self.is_muted = False
+        self.audio_bytes = b""
 
     def mute(self):
         """Mute"""
@@ -104,4 +107,10 @@ class BaseThreadAsyncAudioService(
 
     def terminate(self):
         self._ended = True
+        if self.audio_service_config.audio_encoding == AudioEncoding.MULAW:
+            data = audioop.ulaw2lin(self.audio_bytes, 2)
+        else:
+            data = self.audio_bytes
+        audio_data = np.frombuffer(data, dtype=np.int16)
+        soundfile.write("/Users/aliziaei/Desktop/processed_audio.wav", audio_data, 8000)
         ThreadAsyncWorker.terminate(self)

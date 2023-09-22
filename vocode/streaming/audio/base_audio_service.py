@@ -59,11 +59,9 @@ class BaseThreadAsyncAudioService(
 
     def __init__(
         self,
-        conversation_id: str,
         audio_service_config: AudioServiceConfigType,
         logger: Optional[logging.Logger] = None,
     ):
-        self.conversation_id = conversation_id
         self.is_muted = False
         self._ended = False
         self.input_queue: asyncio.Queue[bytes] = asyncio.Queue()
@@ -108,16 +106,4 @@ class BaseThreadAsyncAudioService(
 
     def terminate(self):
         self._ended = True
-        if self.audio_service_config.log_dir and self.audio_bytes:
-            if self.audio_service_config.audio_encoding == AudioEncoding.MULAW:
-                data = audioop.ulaw2lin(self.audio_bytes, 2)
-            else:
-                data = self.audio_bytes
-            audio_data = np.frombuffer(data, dtype=np.int16)
-            audio_path = os.path.join(
-                self.audio_service_config.log_dir, self.conversation_id + ".flac"
-            )
-            soundfile.write(
-                audio_path, audio_data, self.audio_service_config.sampling_rate
-            )
         ThreadAsyncWorker.terminate(self)

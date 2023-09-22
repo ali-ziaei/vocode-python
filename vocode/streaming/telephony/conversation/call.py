@@ -56,7 +56,7 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
             os.makedirs(events_manager.log_dir, exist_ok=True)
             format_str: str = "%(asctime)s.%03d [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
             log_file = os.path.join(
-                events_manager.log_dir, conversation_id + ".log.json"
+                events_manager.log_dir, conversation_id + ".log.jsonl"
             )
             file_handler = logging.FileHandler(log_file)
             file_handler.setLevel(logging.DEBUG)

@@ -4,6 +4,8 @@ import time
 from typing import Any, AsyncGenerator, Optional, Tuple, Union
 import wave
 import aiohttp
+import datetime
+import json
 
 from vocode import getenv
 from vocode.streaming.synthesizer.base_synthesizer import (
@@ -19,7 +21,7 @@ from vocode.streaming.agent.bot_sentiment_analyser import BotSentiment
 from vocode.streaming.models.message import BaseMessage
 from vocode.streaming.utils.mp3_helper import decode_mp3
 from vocode.streaming.synthesizer.miniaudio_worker import MiniaudioWorker
-
+from vocode.streaming.models.log_message import TTSLog, LogType, BaseLog
 
 ADAM_VOICE_ID = "pNInz6obpgDQGcFmaJgB"
 ELEVEN_LABS_BASE_URL = "https://api.elevenlabs.io/v1/"
@@ -58,6 +60,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         message: BaseMessage,
         chunk_size: int,
         bot_sentiment: Optional[BotSentiment] = None,
+        conversation_id: Optional[str] = None,
     ) -> SynthesisResult:
         voice = self.elevenlabs.Voice(voice_id=self.voice_id)
         if self.stability is not None and self.similarity_boost is not None:
@@ -67,8 +70,29 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
         cache_key = self.get_cache_key(message.text)
         audio_data = self.cache.get(cache_key)
-        if audio_data is None:
-            self.logger.debug("Synthesizing message - message not found in cache")
+
+        start_time = datetime.datetime.utcnow()
+        if audio_data is not None:
+            tts_log = TTSLog(
+                conversation_id=conversation_id if conversation_id else "",
+                message="TTS: Synthesizing speech -> found in Redis.",
+                time_stamp=datetime.datetime.utcnow(),
+                log_type=LogType.TTS,
+                text=message.text,
+                is_cached=True,
+            )
+            self.logger.debug(json.dumps(tts_log.to_dict()))
+
+        else:
+            tts_log = TTSLog(
+                conversation_id=conversation_id if conversation_id else "",
+                message="TTS: Synthesizing speech -> calling API.",
+                time_stamp=datetime.datetime.utcnow(),
+                log_type=LogType.TTS,
+                text=message.text,
+                is_cached=False,
+            )
+            self.logger.debug(json.dumps(tts_log.to_dict()))
 
             url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
             if self.experimental_streaming:
@@ -102,8 +126,20 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                     f"ElevenLabs API returned {response.status} status code"
                 )
 
+            tts_log = TTSLog(
+                conversation_id=conversation_id if conversation_id else "",
+                message="TTS: Synthesizing speech, called API -> Got api response.",
+                time_stamp=datetime.datetime.utcnow(),
+                log_type=LogType.TTS,
+                text=message.text,
+                is_cached=False,
+                start_time=start_time,
+                end_time=datetime.datetime.utcnow(),
+            )
+            self.logger.debug(json.dumps(tts_log.to_dict()))
+
             if self.experimental_streaming:
-                return SynthesisResult(
+                synthesis_result = SynthesisResult(
                     self.experimental_mp3_streaming_output_generator(
                         response, chunk_size, create_speech_span, message
                     ),  # should be wav
@@ -111,6 +147,20 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                         message, seconds, self.words_per_minute
                     ),
                 )
+
+                tts_log = TTSLog(
+                    conversation_id=conversation_id if conversation_id else "",
+                    message="TTS: Synthesizing speech, called API, got api response -> Did audio conversion.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.TTS,
+                    text=message.text,
+                    start_time=start_time,
+                    end_time=datetime.datetime.utcnow(),
+                    is_cached=False,
+                )
+                self.logger.debug(json.dumps(tts_log.to_dict()))
+
+                return synthesis_result
             else:
                 create_speech_span.end()
                 audio_data = await response.read()
@@ -118,12 +168,26 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
         # Each of the branches below use the cached audio to generate a response
         if self.experimental_streaming:
-            return SynthesisResult(
+            synthesis_result = SynthesisResult(
                 self.cached_chunk_generator(audio_data),
                 lambda seconds: self.get_message_cutoff_from_voice_speed(
                     message, seconds, self.words_per_minute
                 ),
             )
+
+            tts_log = TTSLog(
+                conversation_id=conversation_id if conversation_id else "",
+                message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
+                time_stamp=datetime.datetime.utcnow(),
+                log_type=LogType.TTS,
+                text=message.text,
+                start_time=start_time,
+                end_time=datetime.datetime.utcnow(),
+                is_cached=True,
+            )
+            self.logger.debug(json.dumps(tts_log.to_dict()))
+
+            return synthesis_result
         else:
             convert_span = tracer.start_span(
                 f"synthesizer.{SynthesizerType.ELEVEN_LABS.value.split('_', 1)[-1]}.convert",
@@ -137,5 +201,15 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 chunk_size=chunk_size,
             )
             convert_span.end()
-
+            tts_log = TTSLog(
+                conversation_id=conversation_id if conversation_id else "",
+                message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
+                time_stamp=datetime.datetime.utcnow(),
+                log_type=LogType.TTS,
+                text=message.text,
+                start_time=start_time,
+                end_time=datetime.datetime.utcnow(),
+                is_cached=True,
+            )
+            self.logger.debug(json.dumps(tts_log.to_dict()))
             return result

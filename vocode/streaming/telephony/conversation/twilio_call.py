@@ -29,6 +29,9 @@ from vocode.streaming.utils.events_manager import EventsManager
 from vocode.streaming.utils.state_manager import TwilioCallStateManager
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.audio.factory import AudioServiceFactory
+from vocode.streaming.models.log_message import AudioLog, LogType
+import datetime
+import json
 
 
 class PhoneCallWebsocketAction(Enum):
@@ -156,6 +159,13 @@ class TwilioCall(Call[TwilioOutputDevice]):
                     int(media["timestamp"]) - (self.latest_media_timestamp + 20)
                 )
                 self.logger.debug(f"Filling {bytes_to_fill} bytes of silence")
+                audio_log = AudioLog(
+                    conversation_id=self.id,
+                    message="Audio: Start sending audio to audio service.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.AUDIO,
+                )
+                self.logger.debug(json.dumps(audio_log.to_dict()))
                 # NOTE: 0xff is silence for mulaw audio
                 self.audio_service.send_audio(b"\xff" * bytes_to_fill)
             self.latest_media_timestamp = int(media["timestamp"])

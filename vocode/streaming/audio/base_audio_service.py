@@ -3,6 +3,9 @@ from typing import Optional
 import asyncio
 import queue
 import audioop
+import numpy as np
+import os
+import soundfile
 from typing import TypeVar, Generic
 from vocode.streaming.utils.worker import ThreadAsyncWorker
 from vocode.streaming.models.audio_encoding import AudioEncoding
@@ -17,6 +20,7 @@ class AbstractAudioService(Generic[AudioServiceConfigType]):
     def __init__(self, audio_service_config: AudioServiceConfigType):
         self.audio_service_config = audio_service_config
         self.is_muted = False
+        self.audio_bytes = b""
 
     def mute(self):
         """Mute"""
@@ -55,11 +59,9 @@ class BaseThreadAsyncAudioService(
 
     def __init__(
         self,
-        conversation_id: str,
         audio_service_config: AudioServiceConfigType,
         logger: Optional[logging.Logger] = None,
     ):
-        self.conversation_id = conversation_id
         self.is_muted = False
         self._ended = False
         self.input_queue: asyncio.Queue[bytes] = asyncio.Queue()

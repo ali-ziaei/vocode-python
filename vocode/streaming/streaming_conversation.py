@@ -140,15 +140,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.logger.info("Ignoring empty transcription")
                 return
             if transcription.is_final:
-                is_final = True
-                message = "ASR: Final transcription."
                 asr_log = ASRLog(
                     conversation_id=self.conversation.id,
-                    message=message,
+                    message="ASR: Final transcription.",
                     time_stamp=datetime.datetime.utcnow(),
                     log_type=LogType.ASR,
                     transcript=transcription.message,
-                    is_final=is_final,
+                    is_final=True,
                     start_time=transcription.start_time,
                     end_time=transcription.end_time,
                 )

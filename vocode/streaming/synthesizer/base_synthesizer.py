@@ -11,6 +11,7 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    Optional,
 )
 import math
 import io
@@ -204,6 +205,7 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
         message: BaseMessage,
         chunk_size: int,
         bot_sentiment: Optional[BotSentiment] = None,
+        conversation_id: Optional[str] = None,
     ) -> SynthesisResult:
         raise NotImplementedError
 

@@ -9,16 +9,20 @@ from vocode.streaming.models.model import BaseModel
 
 from vocode.streaming.models.transcriber import TranscriberConfig
 from vocode.streaming.utils.worker import AsyncWorker, ThreadAsyncWorker
-
+from typing import Optional
+import datetime
 
 tracer = trace.get_tracer(__name__)
 meter = metrics.get_meter(__name__)
+
 
 class Transcription(BaseModel):
     message: str
     confidence: float
     is_final: bool
     is_interrupt: bool = False
+    start_time: Optional[datetime.datetime] = None
+    end_time: Optional[datetime.datetime] = None
 
     def __str__(self):
         return f"Transcription({self.message}, {self.confidence}, {self.is_final})"

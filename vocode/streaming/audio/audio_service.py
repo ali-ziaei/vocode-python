@@ -3,6 +3,7 @@ from typing import Optional
 
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioService
+from vocode.streaming.models.audio_encoding import AudioEncoding
 
 
 class AudioService(BaseThreadAsyncAudioService[AudioServiceConfig]):
@@ -10,14 +11,14 @@ class AudioService(BaseThreadAsyncAudioService[AudioServiceConfig]):
 
     def __init__(
         self,
-        conversation_id: str,
         audio_service_config: AudioServiceConfig,
         logger: Optional[logging.Logger] = None,
     ):
-        super().__init__(conversation_id, audio_service_config, logger)
+        super().__init__(audio_service_config, logger)
 
     def process(self, chunk: bytes) -> bytes:
         """No processing"""
+        self.audio_bytes += chunk
         return chunk
 
     def _run_loop(self):

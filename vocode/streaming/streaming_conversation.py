@@ -318,7 +318,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         await self.conversation.filler_audio_worker.wait_for_filler_audio_to_finish()
 
                 tts_log = TTSLog(
-                    conversation_id="",
+                    conversation_id=self.conversation.id,
                     message="TTS: Synthesizing speech.",
                     time_stamp=datetime.datetime.utcnow(),
                     log_type=LogType.TTS,

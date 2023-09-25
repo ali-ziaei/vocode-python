@@ -23,7 +23,7 @@ class BaseLog(DataClassDictMixin):
 
 @dataclass
 class AudioLog(BaseLog):
-    """Will add details as needed"""
+    """This log is responsible to capture audio related loggings"""
 
 
 @dataclass

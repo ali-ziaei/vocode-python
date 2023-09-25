@@ -8,9 +8,10 @@ from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, 
 import logging
 import time
 import typing
+import datetime
+import json
 
 from vocode.streaming.action.worker import ActionsWorker
-
 from vocode.streaming.agent.bot_sentiment_analyser import (
     BotSentimentAnalyser,
 )
@@ -33,6 +34,7 @@ from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
 from vocode.streaming.models.synthesizer import (
     SentimentConfig,
 )
+from vocode.streaming.models.log_message import ASRLog, TTSLog, LogType, BaseLog
 from vocode.streaming.constants import (
     TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
     PER_CHUNK_ALLOWANCE_SECONDS,
@@ -138,11 +140,18 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.logger.info("Ignoring empty transcription")
                 return
             if transcription.is_final:
-                self.conversation.logger.debug(
-                    "Got transcription: {}, confidence: {}".format(
-                        transcription.message, transcription.confidence
-                    )
+                asr_log = ASRLog(
+                    conversation_id=self.conversation.id,
+                    message="ASR: Final transcription.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.ASR,
+                    transcript=transcription.message,
+                    is_final=True,
+                    start_time=transcription.start_time,
+                    end_time=transcription.end_time,
                 )
+                self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+
             if (
                 not self.conversation.is_human_speaking
                 and self.conversation.is_interrupt(transcription)
@@ -152,7 +161,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 if self.conversation.current_transcription_is_interrupt:
                     self.conversation.logger.debug("sending interrupt")
-                self.conversation.logger.debug("Human started speaking")
+                base_log = BaseLog(
+                    conversation_id=self.conversation.id,
+                    message="Human started speaking",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.BASE,
+                )
+                self.conversation.logger.debug(json.dumps(base_log.to_dict()))
 
             transcription.is_interrupt = (
                 self.conversation.current_transcription_is_interrupt
@@ -302,9 +317,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     ):
                         await self.conversation.filler_audio_worker.wait_for_filler_audio_to_finish()
 
-                self.conversation.logger.debug(
-                    f"Synthesizing speech for message: {agent_response_message.message}"
+                tts_log = TTSLog(
+                    conversation_id=self.conversation.id,
+                    message="TTS: Synthesizing speech.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.TTS,
+                    text=agent_response_message.message.text,
                 )
+                self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
+
                 synthesis_result = await self.conversation.synthesizer.create_speech(
                     agent_response_message.message,
                     self.chunk_size,
@@ -337,6 +358,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
+                start_time = datetime.datetime.utcnow()
                 message, synthesis_result = item.payload
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
@@ -361,7 +383,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                 )
                 item.agent_response_tracker.set()
-                self.conversation.logger.debug("Message sent: {}".format(message_sent))
+                tts_log = TTSLog(
+                    conversation_id=self.conversation.id,
+                    message="TTS: Message played back.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.TTS,
+                    text=message_sent,
+                    start_time=start_time,
+                    end_time=datetime.datetime.utcnow(),
+                )
+                self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
                 if cut_off:
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
@@ -650,6 +681,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         )
         chunk_idx = 0
         seconds_spoken = 0
+        start_time_and_date = datetime.datetime.utcnow()
         async for chunk_result in synthesis_result.chunk_generator:
             start_time = time.time()
             speech_length_seconds = seconds_per_chunk * (
@@ -657,12 +689,18 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
             seconds_spoken = chunk_idx * seconds_per_chunk
             if stop_event.is_set():
-                self.logger.debug(
-                    "Interrupted, stopping text to speech after {} chunks".format(
-                        chunk_idx
-                    )
-                )
                 message_sent = f"{synthesis_result.get_message_up_to(seconds_spoken)}-"
+                tts_log = TTSLog(
+                    conversation_id=self.id,
+                    message="TTS: Interrupted, stopping text to speech.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.TTS,
+                    text=message_sent,
+                    start_time=start_time_and_date,
+                    end_time=datetime.datetime.utcnow(),
+                )
+                self.logger.debug(json.dumps(tts_log.to_dict()))
+
                 cut_off = True
                 break
             if chunk_idx == 0:
@@ -671,9 +709,17 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_device.consume_nonblocking(chunk_result.chunk)
             end_time = time.time()
 
-            self.logger.debug(
-                "Sent chunk {} with size {}".format(chunk_idx, len(chunk_result.chunk))
+            tts_log = TTSLog(
+                conversation_id=self.id,
+                message=f'TTS: Sent chunk "{chunk_idx}" with length (sample): "{len(chunk_result.chunk)}" to output device.',
+                time_stamp=datetime.datetime.utcnow(),
+                log_type=LogType.TTS,
+                text=message_sent,
+                start_time=start_time_and_date,
+                end_time=datetime.datetime.utcnow(),
             )
+            self.logger.debug(json.dumps(tts_log.to_dict()))
+
             await asyncio.sleep(
                 max(
                     speech_length_seconds

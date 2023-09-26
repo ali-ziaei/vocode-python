@@ -330,6 +330,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     agent_response_message.message,
                     self.chunk_size,
                     bot_sentiment=self.conversation.bot_sentiment,
+                    conversation_id=self.conversation.id,
                 )
                 self.produce_interruptible_agent_response_event_nonblocking(
                     (agent_response_message.message, synthesis_result),
@@ -681,8 +682,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         )
         chunk_idx = 0
         seconds_spoken = 0
-        start_time_and_date = datetime.datetime.utcnow()
         async for chunk_result in synthesis_result.chunk_generator:
+            start_time_and_date = datetime.datetime.utcnow()
             start_time = time.time()
             speech_length_seconds = seconds_per_chunk * (
                 len(chunk_result.chunk) / chunk_size
@@ -711,7 +712,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
             tts_log = TTSLog(
                 conversation_id=self.id,
-                message=f'TTS: Sent chunk "{chunk_idx}" with length (sample): "{len(chunk_result.chunk)}" to output device.',
+                message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{speech_length_seconds}" to output device.',
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message_sent,

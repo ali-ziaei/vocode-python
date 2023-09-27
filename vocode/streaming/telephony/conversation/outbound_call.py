@@ -1,4 +1,6 @@
 import logging
+import os
+from redis import Redis
 from typing import Optional, Union
 from vocode import getenv
 
@@ -78,6 +80,9 @@ class OutboundCall:
         self.synthesizer_config = self.create_synthesizer_config(synthesizer_config)
         self.telephony_id = None
         self.output_to_speaker = output_to_speaker
+        self.redis_client = Redis(
+            host=os.environ.get("REDISHOST", "localhost"),
+            port=int(os.environ.get("REDISPORT", 6379)))
 
     def create_telephony_client(self) -> BaseTelephonyClient:
         if self.twilio_config is not None:
@@ -141,6 +146,11 @@ class OutboundCall:
             record=self.telephony_client.get_telephony_config().record,
             digits=self.digits,
         )
+        self.redis_client.setex(
+            name=f"csid_{self.telephony_id}",
+            value=self.conversation_id,
+            time=86400)
+
         if isinstance(self.telephony_client, TwilioClient):
             call_config = TwilioCallConfig(
                 audio_service_config=self.audio_service_config,

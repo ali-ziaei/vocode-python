@@ -151,6 +151,18 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     end_time=transcription.end_time,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+            else:
+                asr_log = ASRLog(
+                    conversation_id=self.conversation.id,
+                    message="ASR: Partial transcription.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    log_type=LogType.ASR,
+                    transcript=transcription.message,
+                    is_final=False,
+                    start_time=transcription.start_time,
+                    end_time=transcription.end_time,
+                )
+                self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
 
             if (
                 not self.conversation.is_human_speaking
@@ -330,6 +342,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     agent_response_message.message,
                     self.chunk_size,
                     bot_sentiment=self.conversation.bot_sentiment,
+                    conversation_id=self.conversation.id,
                 )
                 self.produce_interruptible_agent_response_event_nonblocking(
                     (agent_response_message.message, synthesis_result),
@@ -681,8 +694,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         )
         chunk_idx = 0
         seconds_spoken = 0
-        start_time_and_date = datetime.datetime.utcnow()
         async for chunk_result in synthesis_result.chunk_generator:
+            start_time_and_date = datetime.datetime.utcnow()
             start_time = time.time()
             speech_length_seconds = seconds_per_chunk * (
                 len(chunk_result.chunk) / chunk_size
@@ -711,7 +724,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
             tts_log = TTSLog(
                 conversation_id=self.id,
-                message=f'TTS: Sent chunk "{chunk_idx}" with length (sample): "{len(chunk_result.chunk)}" to output device.',
+                message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{speech_length_seconds}" to output device.',
                 time_stamp=datetime.datetime.utcnow(),
                 log_type=LogType.TTS,
                 text=message_sent,

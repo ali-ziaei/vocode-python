@@ -80,6 +80,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 log_type=LogType.TTS,
                 text=message.text,
                 is_cached=True,
+                start_time=start_time,
+                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -91,6 +93,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 log_type=LogType.TTS,
                 text=message.text,
                 is_cached=False,
+                start_time=start_time,
+                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 

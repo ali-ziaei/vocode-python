@@ -21,7 +21,7 @@ from vocode.streaming.agent.bot_sentiment_analyser import BotSentiment
 from vocode.streaming.models.message import BaseMessage
 from vocode.streaming.utils.mp3_helper import decode_mp3
 from vocode.streaming.synthesizer.miniaudio_worker import MiniaudioWorker
-from vocode.streaming.models.log_message import TTSLog, LogType, BaseLog
+from vocode.streaming.models.log_message import BaseLog
 
 ADAM_VOICE_ID = "pNInz6obpgDQGcFmaJgB"
 ELEVEN_LABS_BASE_URL = "https://api.elevenlabs.io/v1/"
@@ -73,26 +73,22 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
 
         start_time = datetime.datetime.utcnow()
         if audio_data is not None:
-            tts_log = TTSLog(
+            tts_log = BaseLog(
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech -> found in Redis.",
                 time_stamp=datetime.datetime.utcnow(),
-                log_type=LogType.TTS,
                 text=message.text,
-                is_cached=True,
                 start_time=start_time,
                 end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
         else:
-            tts_log = TTSLog(
+            tts_log = BaseLog(
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech -> calling API.",
                 time_stamp=datetime.datetime.utcnow(),
-                log_type=LogType.TTS,
                 text=message.text,
-                is_cached=False,
                 start_time=start_time,
                 end_time=datetime.datetime.utcnow(),
             )
@@ -130,13 +126,11 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                     f"ElevenLabs API returned {response.status} status code"
                 )
 
-            tts_log = TTSLog(
+            tts_log = BaseLog(
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech, called API -> Got api response.",
                 time_stamp=datetime.datetime.utcnow(),
-                log_type=LogType.TTS,
                 text=message.text,
-                is_cached=False,
                 start_time=start_time,
                 end_time=datetime.datetime.utcnow(),
             )
@@ -152,15 +146,13 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                     ),
                 )
 
-                tts_log = TTSLog(
+                tts_log = BaseLog(
                     conversation_id=conversation_id if conversation_id else "",
                     message="TTS: Synthesizing speech, called API, got api response -> Did audio conversion.",
                     time_stamp=datetime.datetime.utcnow(),
-                    log_type=LogType.TTS,
                     text=message.text,
                     start_time=start_time,
                     end_time=datetime.datetime.utcnow(),
-                    is_cached=False,
                 )
                 self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -179,15 +171,13 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 ),
             )
 
-            tts_log = TTSLog(
+            tts_log = BaseLog(
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 time_stamp=datetime.datetime.utcnow(),
-                log_type=LogType.TTS,
                 text=message.text,
                 start_time=start_time,
                 end_time=datetime.datetime.utcnow(),
-                is_cached=True,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -205,15 +195,13 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 chunk_size=chunk_size,
             )
             convert_span.end()
-            tts_log = TTSLog(
+            tts_log = BaseLog(
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 time_stamp=datetime.datetime.utcnow(),
-                log_type=LogType.TTS,
                 text=message.text,
                 start_time=start_time,
                 end_time=datetime.datetime.utcnow(),
-                is_cached=True,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
             return result

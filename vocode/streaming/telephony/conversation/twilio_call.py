@@ -30,7 +30,7 @@ from vocode.streaming.utils.events_manager import EventsManager
 from vocode.streaming.utils.state_manager import TwilioCallStateManager
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.audio.factory import AudioServiceFactory
-from vocode.streaming.models.log_message import AudioLog, LogType
+from vocode.streaming.models.log_message import BaseLog
 import datetime
 import json
 
@@ -90,11 +90,9 @@ class TwilioCall(Call[TwilioOutputDevice]):
         self.twilio_sid = twilio_sid
         redis_client = Redis(
             host=os.environ.get("REDISHOST", "localhost"),
-            port=int(os.environ.get("REDISPORT", 6379)))
-        redis_client.setex(
-            name=f"csid_{twilio_sid}",
-            value=conversation_id,
-            time=86400)
+            port=int(os.environ.get("REDISPORT", 6379)),
+        )
+        redis_client.setex(name=f"csid_{twilio_sid}", value=conversation_id, time=86400)
         self.latest_media_timestamp = 0
 
     def create_state_manager(self) -> TwilioCallStateManager:
@@ -167,11 +165,10 @@ class TwilioCall(Call[TwilioOutputDevice]):
                     int(media["timestamp"]) - (self.latest_media_timestamp + 20)
                 )
                 self.logger.debug(f"Filling {bytes_to_fill} bytes of silence")
-                audio_log = AudioLog(
+                audio_log = BaseLog(
                     conversation_id=self.id,
                     message="Audio: Start sending audio to audio service.",
                     time_stamp=datetime.datetime.utcnow(),
-                    log_type=LogType.AUDIO,
                 )
                 self.logger.debug(json.dumps(audio_log.to_dict()))
                 # NOTE: 0xff is silence for mulaw audio

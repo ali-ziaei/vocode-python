@@ -108,8 +108,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self.is_ready = False
 
     def recognized_sentence_final(self, evt):
-        start_time, end_time = self._get_start_end(evt)
-        latency = self._get_latency(evt)
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(
                 message=evt.result.text,
@@ -119,8 +117,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         )
 
     def recognized_sentence_stream(self, evt):
-        start_time, end_time = self._get_start_end(evt)
-        latency = self._get_latency(evt)
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(
                 message=evt.result.text,

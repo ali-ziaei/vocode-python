@@ -168,8 +168,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self.speech.start_continuous_recognition_async()
 
         for content in stream:
-            if self.initial_time is None and content:
-                self.initial_time = datetime.datetime.utcnow()
             self.push_stream.write(content)
             if self._ended:
                 break

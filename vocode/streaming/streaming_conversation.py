@@ -382,8 +382,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="TTS: Message played back.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=message_sent,
-                    start_time=start_time,
-                    end_time=datetime.datetime.utcnow(),
                 )
                 self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
                 if cut_off:
@@ -688,8 +686,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="TTS: Interrupted, stopping text to speech.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=message_sent,
-                    start_time=start_time_and_date,
-                    end_time=datetime.datetime.utcnow(),
                 )
                 self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -706,8 +702,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{speech_length_seconds}" to output device.',
                 time_stamp=datetime.datetime.utcnow(),
                 text=message_sent,
-                start_time=start_time_and_date,
-                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 

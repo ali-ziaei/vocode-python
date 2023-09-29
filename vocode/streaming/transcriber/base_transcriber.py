@@ -21,9 +21,6 @@ class Transcription(BaseModel):
     confidence: float
     is_final: bool
     is_interrupt: bool = False
-    start_time: Optional[datetime.datetime] = None
-    end_time: Optional[datetime.datetime] = None
-    latency: Optional[float] = None
 
     def __str__(self):
         return f"Transcription({self.message}, {self.confidence}, {self.is_final})"

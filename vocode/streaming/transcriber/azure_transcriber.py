@@ -107,29 +107,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self._ended = False
         self.is_ready = False
 
-    def _get_start_end(self, evt, offset: float = 907):
-        # offset (msec) is to align asr and TTs with audio (twilio)
-        start_time = None
-        end_time = None
-        if self.initial_time is not None:
-            start_time = self.initial_time + datetime.timedelta(
-                microseconds=evt.result.offset / 10
-            )
-            end_time = start_time + datetime.timedelta(
-                microseconds=evt.result.duration / 10
-            )
-        return start_time, end_time
-
-    def _get_latency(self, evt):
-        return float(
-            int(
-                evt.result.properties[
-                    speechsdk.PropertyId.SpeechServiceResponse_RecognitionLatencyMs
-                ]
-            )
-            / 1000
-        )
-
     def recognized_sentence_final(self, evt):
         start_time, end_time = self._get_start_end(evt)
         latency = self._get_latency(evt)
@@ -138,9 +115,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=True,
-                start_time=start_time,
-                end_time=end_time,
-                latency=latency,
             )
         )
 
@@ -152,9 +126,6 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=False,
-                start_time=start_time,
-                end_time=end_time,
-                latency=latency,
             )
         )
 

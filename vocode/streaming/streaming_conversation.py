@@ -136,9 +136,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="ASR: Final transcription.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=transcription.message,
-                    start_time=transcription.start_time,
-                    end_time=transcription.end_time,
-                    latency=transcription.latency,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             else:
@@ -147,9 +144,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="ASR: Partial transcription.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=transcription.message,
-                    start_time=transcription.start_time,
-                    end_time=transcription.end_time,
-                    latency=transcription.latency,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
 

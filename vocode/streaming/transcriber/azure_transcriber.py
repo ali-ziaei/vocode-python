@@ -118,9 +118,7 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
             end_time = start_time + datetime.timedelta(
                 microseconds=evt.result.duration / 10
             )
-        return start_time - datetime.timedelta(
-            milliseconds=offset
-        ), end_time - datetime.timedelta(milliseconds=offset)
+        return start_time, end_time
 
     def _get_latency(self, evt):
         return float(

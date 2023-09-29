@@ -126,8 +126,8 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
                 evt.result.properties[
                     speechsdk.PropertyId.SpeechServiceResponse_RecognitionLatencyMs
                 ]
-                / 1000
             )
+            / 1000
         )
 
     def recognized_sentence_final(self, evt):

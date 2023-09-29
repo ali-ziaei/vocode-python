@@ -172,7 +172,6 @@ class TwilioCall(Call[TwilioOutputDevice]):
                 )
                 self.logger.debug(json.dumps(audio_log.to_dict()))
                 # NOTE: 0xff is silence for mulaw audio
-                self.transcriber.initial_time = datetime.datetime.utcnow()
                 self.audio_service.send_audio(b"\xff" * bytes_to_fill)
             self.latest_media_timestamp = int(media["timestamp"])
             self.audio_service.send_audio(chunk)

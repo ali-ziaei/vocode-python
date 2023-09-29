@@ -112,10 +112,10 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         end_time = None
         if self.initial_time:
             start_time = self.initial_time + datetime.timedelta(
-                seconds=evt.result.offset / 1e7
+                microseconds=evt.result.offset / 10
             )
             end_time = start_time + datetime.timedelta(
-                seconds=evt.result.duration / 1e7
+                microseconds=evt.result.duration / 10
             )
         return start_time, end_time
 
@@ -168,6 +168,8 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self.speech.start_continuous_recognition_async()
 
         for content in stream:
+            if self.initial_time is None and content:
+                self.initial_time = datetime.datetime.utcnow()
             self.push_stream.write(content)
             if self._ended:
                 break

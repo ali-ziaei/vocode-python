@@ -557,7 +557,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
     async def send_initial_message(self, initial_message: BaseMessage):
         # TODO: configure if initial message is interruptible
-        # self.transcriber.mute()
+        self.transcriber.mute()
         initial_message_tracker = asyncio.Event()
         agent_response_event = (
             self.interruptible_event_factory.create_interruptible_agent_response_event(

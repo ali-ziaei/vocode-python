@@ -71,15 +71,12 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         cache_key = self.get_cache_key(message.text)
         audio_data = self.cache.get(cache_key)
 
-        start_time = datetime.datetime.utcnow()
         if audio_data is not None:
             tts_log = BaseLog(
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech -> found in Redis.",
                 time_stamp=datetime.datetime.utcnow(),
                 text=message.text,
-                start_time=start_time,
-                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -89,8 +86,6 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 message="TTS: Synthesizing speech -> calling API.",
                 time_stamp=datetime.datetime.utcnow(),
                 text=message.text,
-                start_time=start_time,
-                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -131,8 +126,6 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 message="TTS: Synthesizing speech, called API -> Got api response.",
                 time_stamp=datetime.datetime.utcnow(),
                 text=message.text,
-                start_time=start_time,
-                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -151,8 +144,6 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                     message="TTS: Synthesizing speech, called API, got api response -> Did audio conversion.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=message.text,
-                    start_time=start_time,
-                    end_time=datetime.datetime.utcnow(),
                 )
                 self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -176,8 +167,6 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 time_stamp=datetime.datetime.utcnow(),
                 text=message.text,
-                start_time=start_time,
-                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -200,8 +189,6 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 time_stamp=datetime.datetime.utcnow(),
                 text=message.text,
-                start_time=start_time,
-                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
             return result

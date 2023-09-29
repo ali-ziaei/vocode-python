@@ -1,45 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
+import json
+import logging
 import queue
 import random
 import threading
-from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, cast
-import logging
 import time
 import typing
-import datetime
-import json
+from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, cast
 
 from vocode.streaming.action.worker import ActionsWorker
-from vocode.streaming.agent.bot_sentiment_analyser import (
-    BotSentimentAnalyser,
-)
-from vocode.streaming.agent.chat_gpt_agent import ChatGPTAgent
-from vocode.streaming.models.actions import ActionInput
-from vocode.streaming.models.events import Sender
-from vocode.streaming.models.transcript import (
-    Message,
-    Transcript,
-    TranscriptCompleteEvent,
-)
-from vocode.streaming.models.message import BaseMessage
-from vocode.streaming.models.transcriber import EndpointingConfig, TranscriberConfig
-from vocode.streaming.output_device.base_output_device import BaseOutputDevice
-from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
-from vocode.streaming.utils.events_manager import EventsManager
-from vocode.streaming.utils.goodbye_model import GoodbyeModel
-
-from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
-from vocode.streaming.models.synthesizer import (
-    SentimentConfig,
-)
-from vocode.streaming.models.log_message import BaseLog
-from vocode.streaming.constants import (
-    TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
-    PER_CHUNK_ALLOWANCE_SECONDS,
-    ALLOWED_IDLE_TIME,
-)
 from vocode.streaming.agent.base_agent import (
     AgentInput,
     AgentResponse,
@@ -50,28 +22,47 @@ from vocode.streaming.agent.base_agent import (
     BaseAgent,
     TranscriptionAgentInput,
 )
+from vocode.streaming.agent.bot_sentiment_analyser import BotSentimentAnalyser
+from vocode.streaming.agent.chat_gpt_agent import ChatGPTAgent
+from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioService
+from vocode.streaming.constants import (
+    ALLOWED_IDLE_TIME,
+    PER_CHUNK_ALLOWANCE_SECONDS,
+    TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
+)
+from vocode.streaming.models.actions import ActionInput
+from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
+from vocode.streaming.models.audio import AudioServiceConfig
+from vocode.streaming.models.events import Sender
+from vocode.streaming.models.log_message import BaseLog
+from vocode.streaming.models.message import BaseMessage
+from vocode.streaming.models.synthesizer import SentimentConfig
+from vocode.streaming.models.transcriber import EndpointingConfig, TranscriberConfig
+from vocode.streaming.models.transcript import (
+    Message,
+    Transcript,
+    TranscriptCompleteEvent,
+)
+from vocode.streaming.output_device.base_output_device import BaseOutputDevice
 from vocode.streaming.synthesizer.base_synthesizer import (
     BaseSynthesizer,
-    SynthesisResult,
     FillerAudio,
+    SynthesisResult,
 )
+from vocode.streaming.transcriber.base_transcriber import BaseTranscriber, Transcription
 from vocode.streaming.utils import create_conversation_id, get_chunk_size_per_second
-from vocode.streaming.transcriber.base_transcriber import (
-    Transcription,
-    BaseTranscriber,
-)
+from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
+from vocode.streaming.utils.events_manager import EventsManager
+from vocode.streaming.utils.goodbye_model import GoodbyeModel
 from vocode.streaming.utils.state_manager import ConversationStateManager
 from vocode.streaming.utils.worker import (
     AsyncQueueWorker,
+    InterruptibleAgentResponseEvent,
     InterruptibleAgentResponseWorker,
     InterruptibleEvent,
     InterruptibleEventFactory,
-    InterruptibleAgentResponseEvent,
     InterruptibleWorker,
 )
-
-from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioService
-from vocode.streaming.models.audio import AudioServiceConfig
 
 OutputDeviceType = TypeVar("OutputDeviceType", bound=BaseOutputDevice)
 
@@ -145,8 +136,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="ASR: Final transcription.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=transcription.message,
-                    start_time=transcription.start_time,
-                    end_time=transcription.end_time,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             else:
@@ -155,8 +144,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="ASR: Partial transcription.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=transcription.message,
-                    start_time=transcription.start_time,
-                    end_time=transcription.end_time,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
 
@@ -395,8 +382,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="TTS: Message played back.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=message_sent,
-                    start_time=start_time,
-                    end_time=datetime.datetime.utcnow(),
                 )
                 self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
                 if cut_off:
@@ -701,8 +686,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message="TTS: Interrupted, stopping text to speech.",
                     time_stamp=datetime.datetime.utcnow(),
                     text=message_sent,
-                    start_time=start_time_and_date,
-                    end_time=datetime.datetime.utcnow(),
                 )
                 self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -719,8 +702,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{speech_length_seconds}" to output device.',
                 time_stamp=datetime.datetime.utcnow(),
                 text=message_sent,
-                start_time=start_time_and_date,
-                end_time=datetime.datetime.utcnow(),
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 

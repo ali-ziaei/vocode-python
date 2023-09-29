@@ -13,3 +13,4 @@ class BaseLog(DataClassDictMixin):
     text: Optional[str] = None
     start_time: Optional[datetime.datetime] = None
     end_time: Optional[datetime.datetime] = None
+    latency: Optional[float] = None

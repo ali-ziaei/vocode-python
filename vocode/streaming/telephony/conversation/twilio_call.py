@@ -100,7 +100,6 @@ class TwilioCall(Call[TwilioOutputDevice]):
 
     async def attach_ws_and_start(self, ws: WebSocket):
         super().attach_ws(ws)
-        self.transcriber.initial_time = datetime.datetime.utcnow()
 
         twilio_call_ref = self.telephony_client.twilio_client.calls(self.twilio_sid)
         twilio_call = twilio_call_ref.fetch()

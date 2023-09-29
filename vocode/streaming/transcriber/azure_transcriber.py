@@ -107,17 +107,20 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self._ended = False
         self.is_ready = False
 
-    def _get_start_end(self, evt):
+    def _get_start_end(self, evt, offset: float = 907):
+        # offset (msec) is to align asr and TTs with audio (twilio)
         start_time = None
         end_time = None
-        if self.initial_time:
+        if self.initial_time is not None:
             start_time = self.initial_time + datetime.timedelta(
                 microseconds=evt.result.offset / 10
             )
             end_time = start_time + datetime.timedelta(
                 microseconds=evt.result.duration / 10
             )
-        return start_time, end_time
+        return start_time - datetime.timedelta(
+            milliseconds=offset
+        ), end_time - datetime.timedelta(milliseconds=offset)
 
     def recognized_sentence_final(self, evt):
         start_time, end_time = self._get_start_end(evt)
@@ -168,6 +171,8 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self.speech.start_continuous_recognition_async()
 
         for content in stream:
+            if self.initial_time is None and content:
+                self.initial_time = datetime.datetime.utcnow()
             self.push_stream.write(content)
             if self._ended:
                 break

@@ -107,39 +107,21 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self._ended = False
         self.is_ready = False
 
-    def _get_start_end(self, evt):
-        start_time = None
-        end_time = None
-        if self.initial_time:
-            start_time = self.initial_time + datetime.timedelta(
-                seconds=evt.result.offset / 1e7
-            )
-            end_time = start_time + datetime.timedelta(
-                seconds=evt.result.duration / 1e7
-            )
-        return start_time, end_time
-
     def recognized_sentence_final(self, evt):
-        start_time, end_time = self._get_start_end(evt)
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=True,
-                start_time=start_time,
-                end_time=end_time,
             )
         )
 
     def recognized_sentence_stream(self, evt):
-        start_time, end_time = self._get_start_end(evt)
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=False,
-                start_time=start_time,
-                end_time=end_time,
             )
         )
 
@@ -168,6 +150,8 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self.speech.start_continuous_recognition_async()
 
         for content in stream:
+            if self.initial_time is None and content:
+                self.initial_time = datetime.datetime.utcnow()
             self.push_stream.write(content)
             if self._ended:
                 break

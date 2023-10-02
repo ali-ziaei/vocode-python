@@ -45,6 +45,7 @@ class SynthesizerConfig(TypedModel, type=SynthesizerType.BASE.value):
     audio_encoding: AudioEncoding
     should_encode_as_wav: bool = False
     sentiment_config: Optional[SentimentConfig] = None
+    text_to_speech_chunk_size_seconds: float = 1.0
 
     class Config:
         arbitrary_types_allowed = True

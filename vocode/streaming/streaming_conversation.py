@@ -28,7 +28,6 @@ from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioServic
 from vocode.streaming.constants import (
     ALLOWED_IDLE_TIME,
     PER_CHUNK_ALLOWANCE_SECONDS,
-    TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
 )
 from vocode.streaming.models.actions import ActionInput
 from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig

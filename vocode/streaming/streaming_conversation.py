@@ -28,7 +28,6 @@ from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioServic
 from vocode.streaming.constants import (
     ALLOWED_IDLE_TIME,
     PER_CHUNK_ALLOWANCE_SECONDS,
-    TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
 )
 from vocode.streaming.models.actions import ActionInput
 from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
@@ -257,12 +256,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
-            self.chunk_size = (
+            self.chunk_size = int(
                 get_chunk_size_per_second(
                     self.conversation.synthesizer.get_synthesizer_config().audio_encoding,
                     self.conversation.synthesizer.get_synthesizer_config().sampling_rate,
                 )
-                * TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS
+                * self.conversation.synthesizer.get_synthesizer_config().text_to_speech_chunk_size_seconds,
             )
 
         def send_filler_audio(self, agent_response_tracker: Optional[asyncio.Event]):
@@ -352,7 +351,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                start_time = datetime.datetime.utcnow()
                 message, synthesis_result = item.payload
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
@@ -368,7 +366,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     message.text,
                     synthesis_result,
                     item.interruption_event,
-                    TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
+                    self.conversation.synthesizer.get_synthesizer_config().text_to_speech_chunk_size_seconds,
                     transcript_message=transcript_message,
                 )
                 # publish the transcript message now that it includes what was said during send_speech_to_output
@@ -645,7 +643,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         message: str,
         synthesis_result: SynthesisResult,
         stop_event: threading.Event,
-        seconds_per_chunk: int,
+        seconds_per_chunk: float,
         transcript_message: Optional[Message] = None,
         started_event: Optional[threading.Event] = None,
     ):
@@ -666,14 +664,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.transcriber.mute()
         message_sent = message
         cut_off = False
-        chunk_size = seconds_per_chunk * get_chunk_size_per_second(
-            self.synthesizer.get_synthesizer_config().audio_encoding,
-            self.synthesizer.get_synthesizer_config().sampling_rate,
+        chunk_size = int(
+            seconds_per_chunk
+            * get_chunk_size_per_second(
+                self.synthesizer.get_synthesizer_config().audio_encoding,
+                self.synthesizer.get_synthesizer_config().sampling_rate,
+            )
         )
         chunk_idx = 0
         seconds_spoken = 0
         async for chunk_result in synthesis_result.chunk_generator:
-            start_time_and_date = datetime.datetime.utcnow()
             start_time = time.time()
             speech_length_seconds = seconds_per_chunk * (
                 len(chunk_result.chunk) / chunk_size

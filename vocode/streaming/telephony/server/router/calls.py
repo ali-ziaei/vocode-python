@@ -32,6 +32,7 @@ class CallsRouter(BaseRouter):
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
         events_manager: Optional[EventsManager] = None,
+        echo_mode: Optional[bool] = None,
         logger: Optional[logging.Logger] = None,
     ):
         super().__init__()
@@ -42,6 +43,7 @@ class CallsRouter(BaseRouter):
         self.agent_factory = agent_factory
         self.synthesizer_factory = synthesizer_factory
         self.events_manager = events_manager
+        self.echo_mode = echo_mode
         self.logger = logger or logging.getLogger(__name__)
         self.router = APIRouter()
         self.router.websocket("/connect_call/{id}")(self.connect_call)
@@ -58,6 +60,7 @@ class CallsRouter(BaseRouter):
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
         events_manager: Optional[EventsManager] = None,
+        echo_mode: Optional[bool] = None,
     ):
         if isinstance(call_config, TwilioCallConfig):
             return TwilioCall(
@@ -77,6 +80,7 @@ class CallsRouter(BaseRouter):
                 transcriber_factory=transcriber_factory,
                 agent_factory=agent_factory,
                 synthesizer_factory=synthesizer_factory,
+                echo_mode=echo_mode,
                 events_manager=events_manager,
             )
         elif isinstance(call_config, VonageCallConfig):
@@ -98,6 +102,7 @@ class CallsRouter(BaseRouter):
                 agent_factory=agent_factory,
                 synthesizer_factory=synthesizer_factory,
                 events_manager=events_manager,
+                echo_mode=echo_mode,
                 output_to_speaker=call_config.output_to_speaker,
             )
         else:
@@ -119,6 +124,7 @@ class CallsRouter(BaseRouter):
             agent_factory=self.agent_factory,
             synthesizer_factory=self.synthesizer_factory,
             events_manager=self.events_manager,
+            echo_mode=self.echo_mode,
             logger=self.logger,
         )
 

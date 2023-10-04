@@ -51,6 +51,7 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
         events_manager: Optional[EventsManager] = None,
+        echo_mode: Optional[bool] = None,
         logger: Optional[logging.Logger] = None,
     ):
         conversation_id = conversation_id or create_conversation_id()
@@ -77,6 +78,7 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         self.to_phone = to_phone
         self.base_url = base_url
         self.config_manager = config_manager
+        self.echo_mode = echo_mode
         super().__init__(
             output_device,
             audio_service_factory.create_audio_service(
@@ -92,6 +94,7 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
             conversation_id=conversation_id,
             per_chunk_allowance_seconds=0.01,
             events_manager=events_manager,
+            echo_mode=echo_mode,
             logger=self.logger,
         )
 

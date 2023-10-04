@@ -53,6 +53,7 @@ class VonageCall(Call[VonageOutputDevice]):
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
         events_manager: Optional[EventsManager] = None,
         output_to_speaker: bool = False,
+        echo_mode: Optional[bool] = None,
         logger: Optional[logging.Logger] = None,
     ):
         super().__init__(
@@ -67,14 +68,20 @@ class VonageCall(Call[VonageOutputDevice]):
             synthesizer_config,
             conversation_id=conversation_id,
             events_manager=events_manager,
+            audio_service_factory=audio_service_factory,
             transcriber_factory=transcriber_factory,
             agent_factory=agent_factory,
             synthesizer_factory=synthesizer_factory,
+            echo_mode=echo_mode,
             logger=logger,
         )
+        if echo_mode:
+            output_to_speaker = echo_mode
+
         self.output_to_speaker = output_to_speaker
         self.base_url = base_url
         self.config_manager = config_manager
+        self.echo_mode = echo_mode
         self.vonage_config = vonage_config or VonageConfig(
             api_key=getenv("VONAGE_API_KEY"),
             api_secret=getenv("VONAGE_API_SECRET"),

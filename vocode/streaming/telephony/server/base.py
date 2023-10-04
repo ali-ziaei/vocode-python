@@ -75,8 +75,10 @@ class TelephonyServer:
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
         events_manager: Optional[EventsManager] = None,
+        echo_mode: Optional[bool] = None,
         logger: Optional[logging.Logger] = None,
     ):
+        self.echo_mode = echo_mode
         self.base_url = base_url
         self.logger = logger or logging.getLogger(__name__)
         self.router = APIRouter()
@@ -92,6 +94,7 @@ class TelephonyServer:
                 agent_factory=agent_factory,
                 synthesizer_factory=synthesizer_factory,
                 events_manager=self.events_manager,
+                echo_mode=echo_mode,
                 logger=self.logger,
             ).get_router()
         )

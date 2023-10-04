@@ -57,6 +57,7 @@ class TwilioCall(Call[TwilioOutputDevice]):
         transcriber_factory: TranscriberFactory = TranscriberFactory(),
         agent_factory: AgentFactory = AgentFactory(),
         synthesizer_factory: SynthesizerFactory = SynthesizerFactory(),
+        echo_mode: Optional[bool] = None,
         events_manager: Optional[EventsManager] = None,
         logger: Optional[logging.Logger] = None,
     ):
@@ -76,6 +77,7 @@ class TwilioCall(Call[TwilioOutputDevice]):
             transcriber_factory=transcriber_factory,
             agent_factory=agent_factory,
             synthesizer_factory=synthesizer_factory,
+            echo_mode=echo_mode,
             logger=logger,
         )
         self.base_url = base_url
@@ -94,6 +96,7 @@ class TwilioCall(Call[TwilioOutputDevice]):
         )
         redis_client.setex(name=f"csid_{twilio_sid}", value=conversation_id, time=86400)
         self.latest_media_timestamp = 0
+        self.echo_mode = echo_mode
 
     def create_state_manager(self) -> TwilioCallStateManager:
         return TwilioCallStateManager(self)
@@ -172,9 +175,27 @@ class TwilioCall(Call[TwilioOutputDevice]):
                 )
                 self.logger.debug(json.dumps(audio_log.to_dict()))
                 # NOTE: 0xff is silence for mulaw audio
-                self.audio_service.send_audio(b"\xff" * bytes_to_fill)
+                chunk = b"\xff" * bytes_to_fill
+                if self.echo_mode:
+                    twilio_message = {
+                        "event": "media",
+                        "streamSid": self.output_device.stream_sid,
+                        "media": {"payload": base64.b64encode(chunk).decode("utf-8")},
+                    }
+                    await self.output_device.ws.send_text(json.dumps(twilio_message))
+                else:
+                    self.audio_service.send_audio(b"\xff" * bytes_to_fill)
+
             self.latest_media_timestamp = int(media["timestamp"])
-            self.audio_service.send_audio(chunk)
+            if self.echo_mode:
+                twilio_message = {
+                    "event": "media",
+                    "streamSid": self.output_device.stream_sid,
+                    "media": {"payload": base64.b64encode(chunk).decode("utf-8")},
+                }
+                await self.output_device.ws.send_text(json.dumps(twilio_message))
+            else:
+                self.audio_service.send_audio(chunk)
         elif data["event"] == "stop":
             self.logger.debug(f"Media WS: Received event 'stop': {message}")
             self.logger.debug("Stopping...")

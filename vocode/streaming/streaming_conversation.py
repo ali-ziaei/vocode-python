@@ -413,6 +413,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         conversation_id: Optional[str] = None,
         per_chunk_allowance_seconds: float = PER_CHUNK_ALLOWANCE_SECONDS,
         events_manager: Optional[EventsManager] = None,
+        echo_mode: Optional[bool] = None,
         logger: Optional[logging.Logger] = None,
     ):
         self.id = conversation_id or create_conversation_id()
@@ -420,6 +421,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             logger or logging.getLogger(__name__),
             conversation_id=self.id,
         )
+        self.echo_mode = echo_mode
         self.output_device = output_device
         self.audio_service = audio_service
         self.transcriber = transcriber
@@ -510,6 +512,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
         return ConversationStateManager(conversation=self)
 
     async def start(self, mark_ready: Optional[Callable[[], Awaitable[None]]] = None):
+        if self.echo_mode:
+            self.active = True
+            if len(self.events_manager.subscriptions) > 0:
+                self.events_task = asyncio.create_task(self.events_manager.start())
+            self.logger.debug("Running echo mode (None of services running)")
+            return
+
         self.audio_service.start()
         self.transcriber.start()
         self.audio_service_worker.start()

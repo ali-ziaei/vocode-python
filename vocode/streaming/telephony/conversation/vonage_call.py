@@ -75,8 +75,6 @@ class VonageCall(Call[VonageOutputDevice]):
             echo_mode=echo_mode,
             logger=logger,
         )
-        if echo_mode:
-            output_to_speaker = echo_mode
 
         self.output_to_speaker = output_to_speaker
         self.base_url = base_url
@@ -124,6 +122,8 @@ class VonageCall(Call[VonageOutputDevice]):
             try:
                 chunk = await ws.receive_bytes()
                 self.receive_audio(chunk)
+                if self.echo_mode:
+                    self.output_device.consume_nonblocking(chunk)
             except WebSocketDisconnect:
                 self.logger.debug("Websocket disconnected")
                 disconnected = True
@@ -134,9 +134,10 @@ class VonageCall(Call[VonageOutputDevice]):
         await self.tear_down()
 
     def receive_audio(self, chunk: bytes):
-        super().receive_audio(chunk)
-        if self.output_to_speaker:
-            self.output_speaker.consume_nonblocking(chunk)
+        if not self.echo_mode:
+            super().receive_audio(chunk)
+            if self.output_to_speaker:
+                self.output_speaker.consume_nonblocking(chunk)
 
     async def tear_down(self):
         self.events_manager.publish_event(PhoneCallEndedEvent(conversation_id=self.id))

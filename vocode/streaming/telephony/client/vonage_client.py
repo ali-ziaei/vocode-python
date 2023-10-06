@@ -89,6 +89,8 @@ class VonageClient(BaseTelephonyClient):
                 {
                     "action": "record",
                     "eventUrl": [f"https://{base_url}/recordings/{conversation_id}"],
+                    "format": "wav",
+                    "split": "conversation",
                 }
             )
         ncco.append(

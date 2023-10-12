@@ -27,6 +27,7 @@ class TwilioConfig(BaseModel):
     account_sid: str
     auth_token: str
     record: bool = False
+    recording_url: Optional[str] = None
     extra_params: Optional[Dict[str, Any]] = {}
 
 
@@ -36,6 +37,7 @@ class VonageConfig(BaseModel):
     application_id: str
     private_key: str
     record: bool = False
+    recording_url: Optional[str] = None
 
 
 class CallEntity(BaseModel):

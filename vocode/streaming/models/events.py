@@ -17,6 +17,7 @@ class EventType(str, Enum):
     PHONE_CALL_ENDED = "event_phone_call_ended"
     RECORDING = "event_recording"
     ACTION = "event_action"
+    PUBLISH_FILLER = "publish_filler"
 
 
 class Event(TypedModel):
@@ -39,3 +40,7 @@ class RecordingEvent(Event, type=EventType.RECORDING):
 class ActionEvent(Event, type=EventType.ACTION):
     action_input: Optional[dict] = None
     action_output: Optional[dict] = None
+
+
+class FillerEvent(Event, type=EventType.PUBLISH_FILLER):
+    pass

@@ -41,6 +41,7 @@ from vocode.streaming.models.transcript import (
     Message,
     Transcript,
     TranscriptCompleteEvent,
+    Event,
 )
 from vocode.streaming.output_device.base_output_device import BaseOutputDevice
 from vocode.streaming.synthesizer.base_synthesizer import (
@@ -421,6 +422,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
             logger or logging.getLogger(__name__),
             conversation_id=self.id,
         )
+        self.customer_speaking_time = None
+        self.agent_speaking_time = None
+
         self.echo_mode = echo_mode
         self.output_device = output_device
         self.audio_service = audio_service

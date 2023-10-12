@@ -16,6 +16,7 @@ class BaseTelephonyClient:
         to_phone: str,
         from_phone: str,
         record: bool = False,
+        recording_url: Optional[str] = None,
         digits: Optional[str] = None,
     ) -> str:  # identifier of the call on the telephony provider
         raise NotImplementedError

@@ -117,6 +117,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.events_manager.publish_event(
                         FillerEvent(conversation_id=self.conversation.id)
                     )
+                    self.conversation.agent.consume_nonblocking(
+                        AgentResponseMessage(
+                            message=BaseMessage(text="give me a second.")
+                        ),
+                        is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
+                    )
             self.output_queue.put_nowait(item)
 
     class TranscriptionsWorker(AsyncQueueWorker):

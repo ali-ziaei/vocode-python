@@ -117,7 +117,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.events_manager.publish_event(
                         FillerEvent(conversation_id=self.conversation.id)
                     )
-                    self.conversation.agent.consume_nonblocking(
+                    self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
                         AgentResponseMessage(
                             message=BaseMessage(text="give me a second.")
                         ),

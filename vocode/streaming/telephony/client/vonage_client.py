@@ -70,25 +70,28 @@ class VonageClient(BaseTelephonyClient):
         to_phone: str,
         from_phone: str,
         record: bool = False,
+        recording_url: Optional[str] = None,
         digits: Optional[str] = None,
     ) -> str:  # identifier of the call on the telephony provider
         return await self.create_vonage_call(
             to_phone,
             from_phone,
             self.create_call_ncco(
-                self.base_url, conversation_id, record, is_outbound=True
+                self.base_url, conversation_id, record, recording_url, is_outbound=True
             ),
             digits,
         )
 
     @staticmethod
-    def create_call_ncco(base_url, conversation_id, record, is_outbound: bool = False):
+    def create_call_ncco(base_url, conversation_id, record, recording_url: Optional[str] = None, is_outbound: bool = False):
         ncco: List[Dict[str, Any]] = []
         if record:
+            if not recording_url:
+                recording_url = f"https://{base_url}/recordings/{conversation_id}"
             ncco.append(
                 {
                     "action": "record",
-                    "eventUrl": [f"https://{base_url}/recordings/{conversation_id}"],
+                    "eventUrl": [recording_url],
                     "format": "wav",
                     "split": "conversation",
                 }

@@ -104,33 +104,6 @@ class TelephonyServer:
                 self.create_inbound_route(inbound_call_config=config),
                 methods=["POST"],
             )
-        # vonage requires an events endpoint
-        self.router.add_api_route("/events", self.events, methods=["GET", "POST"])
-        self.logger.info(f"Set up events endpoint at https://{self.base_url}/events")
-
-        self.router.add_api_route(
-            "/recordings/{conversation_id}", self.recordings, methods=["GET", "POST"]
-        )
-        self.logger.info(
-            f"Set up recordings endpoint at https://{self.base_url}/recordings/{{conversation_id}}"
-        )
-
-    def events(self, request: Request):
-        return Response()
-
-    async def recordings(self, request: Request, conversation_id: str):
-        recording_url = (await request.json())["recording_url"]
-
-        with open("/tmp/recordings.txt", "a+") as file:
-            file.write(f"{recording_url}\n")
-
-        if self.events_manager is not None and recording_url is not None:
-            self.events_manager.publish_event(
-                RecordingEvent(
-                    recording_url=recording_url, conversation_id=conversation_id
-                )
-            )
-        return Response()
 
     def create_inbound_route(
         self,

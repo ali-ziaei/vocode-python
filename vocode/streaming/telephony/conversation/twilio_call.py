@@ -114,7 +114,7 @@ class TwilioCall(Call[TwilioOutputDevice]):
                 else None
             )
             recording = (
-                twilio_call_ref.recordings.create(**recordings_create_params)
+                twilio_call_ref.recordings.create(recording_status_callback=self.twilio_config.recording_url, **recordings_create_params)
                 if recordings_create_params
                 else twilio_call_ref.recordings.create()
             )

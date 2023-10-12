@@ -32,7 +32,7 @@ from vocode.streaming.constants import (
 from vocode.streaming.models.actions import ActionInput
 from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
 from vocode.streaming.models.audio import AudioServiceConfig
-from vocode.streaming.models.events import Sender
+from vocode.streaming.models.events import Sender, FillerEvent
 from vocode.streaming.models.log_message import BaseLog
 from vocode.streaming.models.message import BaseMessage
 from vocode.streaming.models.synthesizer import SentimentConfig
@@ -100,12 +100,23 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self,
             input_queue: asyncio.Queue[bytes],
             output_queue: asyncio.Queue[bytes],
+            conversation: "StreamingConversation",
         ):
             super().__init__(input_queue, output_queue)
             self.input_queue = input_queue
             self.output_queue = output_queue
+            self.conversation = conversation
 
         async def process(self, item: bytes):
+            if self.conversation.customer_speaking_time:
+                if (
+                    self.conversation.customer_speaking_time
+                    - self.conversation.agent_speaking_time
+                    >= 2
+                ):
+                    self.conversation.events_manager.publish_event(
+                        FillerEvent(conversation_id=self.conversation.id)
+                    )
             self.output_queue.put_nowait(item)
 
     class TranscriptionsWorker(AsyncQueueWorker):
@@ -146,6 +157,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=transcription.message,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+            self.conversation.customer_speaking_time = time.time()
 
             if (
                 not self.conversation.is_human_speaking
@@ -449,6 +461,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.audio_service_worker = self.AudioServiceWorker(
             input_queue=self.audio_service.output_queue,
             output_queue=self.transcriber.input_queue,
+            conversation=self,
         )
 
         self.transcriptions_worker = self.TranscriptionsWorker(
@@ -687,6 +700,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         chunk_idx = 0
         seconds_spoken = 0
         async for chunk_result in synthesis_result.chunk_generator:
+            self.agent_speaking_time = time.time()
             start_time = time.time()
             speech_length_seconds = seconds_per_chunk * (
                 len(chunk_result.chunk) / chunk_size

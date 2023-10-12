@@ -184,6 +184,7 @@ class TelephonyServer:
                 base_url=self.base_url,
                 conversation_id=conversation_id,
                 record=vonage_config.record,
+                recording_url=vonage_config.recording_url,
             )
 
         if isinstance(inbound_call_config, TwilioInboundCallConfig):

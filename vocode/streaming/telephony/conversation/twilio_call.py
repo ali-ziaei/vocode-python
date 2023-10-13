@@ -3,8 +3,6 @@ import base64
 from enum import Enum
 import json
 import logging
-import os
-from redis import Redis
 from typing import Optional
 from vocode import getenv
 from vocode.streaming.agent.factory import AgentFactory
@@ -82,19 +80,16 @@ class TwilioCall(Call[TwilioOutputDevice]):
         )
         self.base_url = base_url
         self.config_manager = config_manager
-        self.twilio_config = twilio_config or TwilioConfig(
-            account_sid=getenv("TWILIO_ACCOUNT_SID"),
-            auth_token=getenv("TWILIO_AUTH_TOKEN"),
-        )
-        self.telephony_client = TwilioClient(
-            base_url=base_url, twilio_config=self.twilio_config
-        )
+        if twilio_config:
+            self.twilio_config = twilio_config.copy(deep=True)
+            self.twilio_config.recording_url = f"{twilio_config.recording_url}/{conversation_id}"
+        else:
+            self.twilio_config = TwilioConfig(
+                account_sid=getenv("TWILIO_ACCOUNT_SID"),
+                auth_token=getenv("TWILIO_AUTH_TOKEN"),
+            )
+        self.telephony_client = TwilioClient(base_url=base_url, twilio_config=self.twilio_config)
         self.twilio_sid = twilio_sid
-        redis_client = Redis(
-            host=os.environ.get("REDISHOST", "localhost"),
-            port=int(os.environ.get("REDISPORT", 6379)),
-        )
-        redis_client.setex(name=f"csid_{twilio_sid}", value=conversation_id, time=86400)
         self.latest_media_timestamp = 0
         self.echo_mode = echo_mode
 

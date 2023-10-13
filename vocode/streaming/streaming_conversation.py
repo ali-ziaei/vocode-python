@@ -106,7 +106,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
 
-        async def publish_fillers(self):
+        async def publish_ask_more_time_filler(self):
+            # when agent or customer are speaking, we return
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
                 return
 
@@ -116,74 +117,95 @@ class StreamingConversation(Generic[OutputDeviceType]):
             ):
                 return
 
+            current_time = time.time()
+            filler_phrase = None
+
+            if self.conversation.spoken_metadata.customer_last_spoken_end_time is None:
+                return
+
+            if self.conversation.spoken_metadata.agent_last_spoken_end_time is None:
+                return
+
+            # case 1: agent need more time (we make sure agent is spoken last)
+            if (
+                self.conversation.spoken_metadata.customer_last_spoken_end_time
+                > self.conversation.spoken_metadata.agent_last_spoken_end_time
+                and current_time
+                - self.conversation.spoken_metadata.customer_last_spoken_end_time
+                > self.conversation.agent_asks_for_more_time_threshold_sec
+            ):
+                filler_phrase = random.choice(
+                    self.conversation.agent_asks_for_more_time_filler_phrases
+                )
+                await self.publish_filler(filler_phrase)
+
+        async def publish_ask_speak_up_filler(self):
+            if not self.conversation.spoken_metadata.ready_to_publish_filler:
+                return
+
             if not (
                 self.conversation.agent_asks_for_speak_up_filler_phrases
                 and self.conversation.agent_asks_for_speak_up_threshold_sec
             ):
                 return
 
+            if self.conversation.spoken_metadata.agent_last_spoken_end_time is None:
+                return
+
             current_time = time.time()
             filler_phrase = None
 
-            # both agent and customer are done
-            if (
-                self.conversation.spoken_metadata.customer_last_spoken_start_time
-                and self.conversation.spoken_metadata.customer_last_spoken_end_time
-            ):
+            # case 2: agent ask customer to speak
+            # if customer has not spoken at all (after greeting)
+            if self.conversation.spoken_metadata.customer_last_spoken_end_time is None:
                 if (
-                    self.conversation.spoken_metadata.agent_last_spoken_start_time
-                    and self.conversation.spoken_metadata.agent_last_spoken_end_time
+                    current_time
+                    - self.conversation.spoken_metadata.agent_last_spoken_end_time
+                    > self.conversation.agent_asks_for_speak_up_threshold_sec
                 ):
-                    # case 1: agent waiting for customer to speak
-                    if (
-                        self.conversation.spoken_metadata.agent_last_spoken_end_time
-                        > self.conversation.spoken_metadata.customer_last_spoken_end_time
-                    ):
-                        if (
-                            current_time
-                            - self.conversation.spoken_metadata.agent_last_spoken_end_time
-                            > self.conversation.agent_asks_for_speak_up_threshold_sec
-                        ):
-                            filler_phrase = random.choice(
-                                self.conversation.agent_asks_for_speak_up_filler_phrases
-                            )
-                    # case 2: customer is waiting for agent to speak
-                    else:
-                        if (
-                            current_time
-                            - self.conversation.spoken_metadata.customer_last_spoken_end_time
-                            > self.conversation.agent_asks_for_more_time_threshold_sec
-                        ):
-                            filler_phrase = random.choice(
-                                self.conversation.agent_asks_for_more_time_filler_phrases
-                            )
-                    if filler_phrase:
-                        self.conversation.events_manager.publish_event(
-                            FillerEvent(
-                                conversation_id=self.conversation.id,
-                                filler_phrase=filler_phrase,
-                            )
-                        )
-                        self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
-                            AgentResponseMessage(
-                                message=BaseMessage(text=filler_phrase)
-                            ),
-                            is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
-                        )
-                        self.conversation.spoken_metadata.ready_to_publish_filler = (
-                            False
-                        )
-                        filler_log = BaseLog(
-                            conversation_id=self.conversation.id,
-                            message="FILLER: Published filler.",
-                            time_stamp=datetime.datetime.utcnow(),
-                            text=filler_phrase,
-                        )
-                        self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
+                    filler_phrase = random.choice(
+                        self.conversation.agent_asks_for_speak_up_filler_phrases
+                    )
+                    await self.publish_filler(filler_phrase)
+                    return
+
+            if (
+                current_time
+                - self.conversation.spoken_metadata.agent_last_spoken_end_time
+                > self.conversation.agent_asks_for_speak_up_threshold_sec
+                and self.conversation.spoken_metadata.agent_last_spoken_end_time
+                > self.conversation.spoken_metadata.customer_last_spoken_end_time
+            ):
+                filler_phrase = random.choice(
+                    self.conversation.agent_asks_for_speak_up_filler_phrases
+                )
+                await self.publish_filler(filler_phrase)
+                return
+
+        async def publish_filler(self, filler_phrase):
+            self.conversation.events_manager.publish_event(
+                FillerEvent(
+                    conversation_id=self.conversation.id,
+                    filler_phrase=filler_phrase,
+                )
+            )
+            self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
+                AgentResponseMessage(message=BaseMessage(text=filler_phrase)),
+                is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
+            )
+            filler_log = BaseLog(
+                conversation_id=self.conversation.id,
+                message="FILLER: Published filler.",
+                time_stamp=datetime.datetime.utcnow(),
+                text=filler_phrase,
+            )
+            self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
+            self.conversation.spoken_metadata.ready_to_publish_filler = False
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
-            await self.publish_fillers()
+            await self.publish_ask_more_time_filler()
+            await self.publish_ask_speak_up_filler()
 
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed
@@ -201,6 +223,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
+            self.start_speaking = False
 
         async def process(self, transcription: Transcription):
             self.conversation.mark_last_action_timestamp()
@@ -208,6 +231,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.logger.info("Ignoring empty transcription")
                 return
             if transcription.is_final:
+                self.start_speaking = False
                 self.conversation.spoken_metadata.customer_last_spoken_end_time = (
                     time.time()
                 )
@@ -221,13 +245,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             else:
-                if (
-                    self.conversation.spoken_metadata.customer_last_spoken_start_time
-                    is None
-                ):
+                if not self.start_speaking:
                     self.conversation.spoken_metadata.customer_last_spoken_start_time = (
                         time.time()
                     )
+                self.start_speaking = True
                 self.conversation.spoken_metadata.customer_last_spoken_end_time = None
                 self.conversation.spoken_metadata.ready_to_publish_filler = False
 

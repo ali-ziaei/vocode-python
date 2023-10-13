@@ -15,6 +15,6 @@ class Templater:
 
     def get_connection_twiml(self, call_id: str, base_url: str):
         return Response(
-        self.render_template("connect_call.xml", base_url=base_url, id=call_id),
+            self.render_template("connect_call.xml", base_url=base_url, id=call_id),
             media_type="application/xml",
         )

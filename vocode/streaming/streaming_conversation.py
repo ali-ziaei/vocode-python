@@ -116,22 +116,25 @@ class StreamingConversation(Generic[OutputDeviceType]):
             ):
                 return
 
+            # both agent and customer are speaking
+            if not (
+                self.conversation.spoken_metadata.agent_last_spoken_end_time
+                and self.conversation.spoken_metadata.customer_last_spoken_end_time
+            ):
+                return
+
             current_time = time.time()
             filler_phrase = None
 
             # case 1: agent need more time
-            if self.conversation.spoken_metadata.agent_last_spoken_end_time:
+            if (
+                current_time
+                - self.conversation.spoken_metadata.agent_last_spoken_end_time
+                > self.conversation.agent_asks_for_more_time_threshold_sec
+            ):
                 if (
                     self.conversation.spoken_metadata.customer_last_spoken_end_time
-                    and self.conversation.spoken_metadata.customer_last_spoken_end_time
-                    < self.conversation.spoken_metadata.agent_last_spoken_end_time
-                ):
-                    return
-
-                if (
-                    current_time
-                    - self.conversation.spoken_metadata.agent_last_spoken_end_time
-                    > self.conversation.agent_asks_for_more_time_threshold_sec
+                    > self.conversation.spoken_metadata.agent_last_spoken_end_time
                 ):
                     filler_phrase = random.choice(
                         self.conversation.agent_asks_for_more_time_filler_phrases
@@ -148,22 +151,25 @@ class StreamingConversation(Generic[OutputDeviceType]):
             ):
                 return
 
+            # both agent and customer are speaking
+            if not (
+                self.conversation.spoken_metadata.agent_last_spoken_end_time
+                and self.conversation.spoken_metadata.customer_last_spoken_end_time
+            ):
+                return
+
             current_time = time.time()
             filler_phrase = None
 
             # case 2: agent ask customer to speak
-            if self.conversation.spoken_metadata.customer_last_spoken_end_time:
+            if (
+                current_time
+                - self.conversation.spoken_metadata.customer_last_spoken_end_time
+                > self.conversation.agent_asks_for_speak_up_threshold_sec
+            ):
                 if (
-                    self.conversation.spoken_metadata.agent_last_spoken_end_time
-                    and self.conversation.spoken_metadata.agent_last_spoken_end_time
-                    < self.conversation.spoken_metadata.customer_last_spoken_end_time
-                ):
-                    return
-
-                if (
-                    current_time
-                    - self.conversation.spoken_metadata.customer_last_spoken_end_time
-                    > self.conversation.agent_asks_for_speak_up_threshold_sec
+                    self.conversation.spoken_metadata.customer_last_spoken_end_time
+                    > self.conversation.spoken_metadata.agent_last_spoken_end_time
                 ):
                     filler_phrase = random.choice(
                         self.conversation.agent_asks_for_speak_up_filler_phrases

@@ -116,30 +116,22 @@ class StreamingConversation(Generic[OutputDeviceType]):
             ):
                 return
 
-            # both agent and customer are speaking
-            if not (
-                self.conversation.spoken_metadata.agent_last_spoken_end_time
-                and self.conversation.spoken_metadata.customer_last_spoken_end_time
-            ):
-                return
-
             current_time = time.time()
             filler_phrase = None
 
             # case 1: agent need more time
             if (
-                current_time
-                - self.conversation.spoken_metadata.agent_last_spoken_end_time
+                self.conversation.spoken_metadata.customer_last_spoken_end_time
+                and self.conversation.spoken_metadata.customer_last_spoken_end_time
+                > self.conversation.spoken_metadata.agent_last_spoken_end_time
+                and current_time
+                - self.conversation.spoken_metadata.customer_last_spoken_end_time
                 > self.conversation.agent_asks_for_more_time_threshold_sec
             ):
-                if (
-                    self.conversation.spoken_metadata.customer_last_spoken_end_time
-                    > self.conversation.spoken_metadata.agent_last_spoken_end_time
-                ):
-                    filler_phrase = random.choice(
-                        self.conversation.agent_asks_for_more_time_filler_phrases
-                    )
-                    await self.publish_filler(filler_phrase)
+                filler_phrase = random.choice(
+                    self.conversation.agent_asks_for_more_time_filler_phrases
+                )
+                await self.publish_filler(filler_phrase)
 
         async def publish_ask_speak_up_filler(self):
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
@@ -151,30 +143,32 @@ class StreamingConversation(Generic[OutputDeviceType]):
             ):
                 return
 
-            # both agent and customer are speaking
-            if not (
-                self.conversation.spoken_metadata.agent_last_spoken_end_time
-                and self.conversation.spoken_metadata.customer_last_spoken_end_time
-            ):
-                return
-
             current_time = time.time()
             filler_phrase = None
 
             # case 2: agent ask customer to speak
             if (
-                current_time
-                - self.conversation.spoken_metadata.customer_last_spoken_end_time
+                self.conversation.spoken_metadata.customer_last_spoken_end_time is None
+                and current_time
+                - self.conversation.spoken_metadata.agent_last_spoken_end_time
                 > self.conversation.agent_asks_for_speak_up_threshold_sec
             ):
-                if (
-                    self.conversation.spoken_metadata.customer_last_spoken_end_time
-                    > self.conversation.spoken_metadata.agent_last_spoken_end_time
-                ):
-                    filler_phrase = random.choice(
-                        self.conversation.agent_asks_for_speak_up_filler_phrases
-                    )
-                    await self.publish_filler(filler_phrase)
+                filler_phrase = random.choice(
+                    self.conversation.agent_asks_for_speak_up_filler_phrases
+                )
+                await self.publish_filler(filler_phrase)
+
+            if (
+                current_time
+                - self.conversation.spoken_metadata.agent_last_spoken_end_time
+                > self.conversation.agent_asks_for_speak_up_threshold_sec
+                and self.conversation.spoken_metadata.agent_last_spoken_end_time
+                > self.conversation.spoken_metadata.customer_last_spoken_end_time
+            ):
+                filler_phrase = random.choice(
+                    self.conversation.agent_asks_for_speak_up_filler_phrases
+                )
+                await self.publish_filler(filler_phrase)
 
         async def publish_filler(self, filler_phrase):
             self.conversation.events_manager.publish_event(

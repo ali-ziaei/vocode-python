@@ -90,6 +90,8 @@ class VonageClient(BaseTelephonyClient):
         if record:
             if not recording_url:
                 recording_url = f"https://{base_url}/recordings/{conversation_id}"
+            elif not recording_url.endswith(conversation_id):
+                recording_url = f"{recording_url}/{conversation_id}"
             ncco.append(
                 {
                     "action": "record",

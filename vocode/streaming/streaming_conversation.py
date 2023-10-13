@@ -143,12 +143,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             filler_phrase = random.choice(
                                 self.conversation.agent_asks_for_speak_up_filler_phrases
                             )
-                            self.conversation.events_manager.publish_event(
-                                FillerEvent(
-                                    conversation_id=self.conversation.id,
-                                    filler_phrase=filler_phrase,
-                                )
-                            )
                     # case 2: customer is waiting for agent to speak
                     else:
                         if (
@@ -159,12 +153,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             filler_phrase = random.choice(
                                 self.conversation.agent_asks_for_more_time_filler_phrases
                             )
-                            self.conversation.events_manager.publish_event(
-                                FillerEvent(
-                                    conversation_id=self.conversation.id,
-                                    filler_phrase=filler_phrase,
-                                )
-                            )
+                    self.conversation.events_manager.publish_event(
+                        FillerEvent(
+                            conversation_id=self.conversation.id,
+                            filler_phrase=filler_phrase,
+                        )
+                    )
+                    self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
+                        AgentResponseMessage(message=BaseMessage(text=filler_phrase)),
+                        is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
+                    )
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)

@@ -21,9 +21,10 @@ class Transcription(BaseModel):
     confidence: float
     is_final: bool
     is_interrupt: bool = False
+    latency: Optional[float] = None
 
     def __str__(self):
-        return f"Transcription({self.message}, {self.confidence}, {self.is_final})"
+        return f"Transcription({self.message}, {self.confidence}, {self.is_final}, {self.latency})"
 
 
 TranscriberConfigType = TypeVar("TranscriberConfigType", bound=TranscriberConfig)
@@ -33,6 +34,7 @@ class AbstractTranscriber(Generic[TranscriberConfigType]):
     def __init__(self, transcriber_config: TranscriberConfigType):
         self.transcriber_config = transcriber_config
         self.is_muted = False
+        self.audio_cursor = 0.0
 
     def mute(self):
         self.is_muted = True

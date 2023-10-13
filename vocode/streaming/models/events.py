@@ -44,3 +44,12 @@ class ActionEvent(Event, type=EventType.ACTION):
 
 class FillerEvent(Event, type=EventType.PUBLISH_FILLER):
     filler_phrase: str
+
+
+class SpokenMetaData:
+    # It is used for filler
+    customer_last_spoken_start_time: Optional[float] = None
+    customer_last_spoken_end_time: Optional[float] = None
+    agent_last_spoken_start_time: Optional[float] = None
+    agent_last_spoken_end_time: Optional[float] = None
+    ready_to_publish_filler: Optional[bool] = None

@@ -98,7 +98,7 @@ class VonageCall(Call[VonageOutputDevice]):
             host=os.environ.get("REDISHOST", "localhost"),
             port=int(os.environ.get("REDISPORT", 6379)),
         )
-        redis_client.setex(name=f"csid_{vonage_uuid}", value=conversation_id, time=86400)
+        redis_client.setex(name=f"cuuid_{vonage_uuid}", value=conversation_id, time=86400)
         if output_to_speaker:
             self.output_speaker = SpeakerOutput.from_default_device(
                 sampling_rate=VONAGE_SAMPLING_RATE, blocksize=VONAGE_CHUNK_SIZE // 2

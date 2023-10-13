@@ -145,6 +145,7 @@ class OutboundCall:
             from_phone=self.from_phone,
             record=self.telephony_client.get_telephony_config().record,
             recording_url=self.telephony_client.get_telephony_config().recording_url,
+            events_url=self.telephony_client.get_telephony_config().events_url,
             digits=self.digits,
         )
         self.redis_client.setex(

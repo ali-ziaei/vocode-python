@@ -121,35 +121,50 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
 
             current_time = time.time()
-            if (
-                current_time - self.conversation.customer_last_spoken_time
-                >= self.conversation.agent_asks_for_more_time_threshold_sec
-            ):
-                if self.conversation.agent_last_spoken_time < current_time:
-                    filler_phrase = random.choice(
-                        self.conversation.agent_asks_for_more_time_filler_phrases
-                    )
-                    self.conversation.events_manager.publish_event(
-                        FillerEvent(
-                            conversation_id=self.conversation.id,
-                            filler_phrase=filler_phrase,
-                        )
-                    )
 
+            # both agent and customer are done
             if (
-                current_time - self.conversation.agent_last_spoken_time
-                >= self.conversation.agent_asks_for_speak_up_threshold_sec
+                self.conversation.customer_last_spoken_start_time
+                and self.conversation.customer_last_spoken_end_time
             ):
-                if self.conversation.customer_last_spoken_time < current_time:
-                    filler_phrase = random.choice(
-                        self.conversation.agent_asks_for_speak_up_filler_phrases
-                    )
-                    self.conversation.events_manager.publish_event(
-                        FillerEvent(
-                            conversation_id=self.conversation.id,
-                            filler_phrase=filler_phrase,
-                        )
-                    )
+                if (
+                    self.conversation.agent_last_spoken_start_time
+                    and self.conversation.agent_last_spoken_end_time
+                ):
+                    # case 1: agent waiting for customer to speak
+                    if (
+                        self.conversation.agent_last_spoken_end_time
+                        > self.conversation.customer_last_spoken_end_time
+                    ):
+                        if (
+                            current_time - self.conversation.agent_last_spoken_end_time
+                            > self.conversation.agent_asks_for_speak_up_threshold_sec
+                        ):
+                            filler_phrase = random.choice(
+                                self.conversation.agent_asks_for_speak_up_filler_phrases
+                            )
+                            self.conversation.events_manager.publish_event(
+                                FillerEvent(
+                                    conversation_id=self.conversation.id,
+                                    filler_phrase=filler_phrase,
+                                )
+                            )
+                    # case 2: customer is waiting for agent to speak
+                    else:
+                        if (
+                            current_time
+                            - self.conversation.customer_last_spoken_end_time
+                            > self.conversation.agent_asks_for_more_time_threshold_sec
+                        ):
+                            filler_phrase = random.choice(
+                                self.conversation.agent_asks_for_more_time_filler_phrases
+                            )
+                            self.conversation.events_manager.publish_event(
+                                FillerEvent(
+                                    conversation_id=self.conversation.id,
+                                    filler_phrase=filler_phrase,
+                                )
+                            )
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -178,6 +193,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.logger.info("Ignoring empty transcription")
                 return
             if transcription.is_final:
+                self.conversation.customer_last_spoken_end_time = time.time()
+                self.agent_last_spoken_end_time = None
                 asr_log = BaseLog(
                     conversation_id=self.conversation.id,
                     message="ASR: Final transcription.",
@@ -186,6 +203,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             else:
+                if self.conversation.customer_last_spoken_start_time is None:
+                    self.conversation.customer_last_spoken_start_time = time.time()
+                self.conversation.customer_last_spoken_end_time = None
                 asr_log = BaseLog(
                     conversation_id=self.conversation.id,
                     message="ASR: Partial transcription.",
@@ -193,8 +213,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=transcription.message,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
-            time_stamp = time.time()
-            self.conversation.customer_last_spoken_time = time_stamp
 
             if (
                 not self.conversation.is_human_speaking
@@ -275,6 +293,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 await asyncio.sleep(silence_threshold)
                 self.conversation.logger.debug("Sending filler audio to output")
                 self.filler_audio_started_event = threading.Event()
+
+                self.agent_last_spoken_start_time = time.time()
+                self.agent_last_spoken_end_time = None
                 await self.conversation.send_speech_to_output(
                     filler_audio.message.text,
                     filler_synthesis_result,
@@ -282,6 +303,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     filler_audio.seconds_per_chunk,
                     started_event=self.filler_audio_started_event,
                 )
+                self.agent_last_spoken_end_time = time.time()
                 item.agent_response_tracker.set()
             except asyncio.CancelledError:
                 pass
@@ -412,6 +434,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                     publish_to_events_manager=False,
                 )
+                self.agent_last_spoken_start_time = time.time()
+                self.agent_last_spoken_end_time = None
                 message_sent, cut_off = await self.conversation.send_speech_to_output(
                     message.text,
                     synthesis_result,
@@ -419,6 +443,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.synthesizer.get_synthesizer_config().text_to_speech_chunk_size_seconds,
                     transcript_message=transcript_message,
                 )
+                self.agent_last_spoken_end_time = time.time()
                 # publish the transcript message now that it includes what was said during send_speech_to_output
                 self.conversation.transcript.maybe_publish_transcript_event_from_message(
                     message=transcript_message,
@@ -479,8 +504,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.agent = agent
 
         # initiate filler pause tracking
-        self.customer_last_spoken_time = None
-        self.agent_last_spoken_time = None
+        self.customer_last_spoken_start_time = None
+        self.customer_last_spoken_end_time = None
+        self.agent_last_spoken_start_time = None
+        self.agent_last_spoken_end_time = None
+
         self.agent_asks_for_more_time_threshold_sec = (
             self.agent.get_agent_config().agent_asks_for_more_time_threshold_sec
         )
@@ -752,9 +780,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
         chunk_idx = 0
         seconds_spoken = 0
         async for chunk_result in synthesis_result.chunk_generator:
-            time_stamp = time.time()
-            self.agent_last_spoken_time = time_stamp
-
             start_time = time.time()
             speech_length_seconds = seconds_per_chunk * (
                 len(chunk_result.chunk) / chunk_size

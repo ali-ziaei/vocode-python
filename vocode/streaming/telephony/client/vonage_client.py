@@ -88,9 +88,7 @@ class VonageClient(BaseTelephonyClient):
     def create_call_ncco(base_url, conversation_id, record, recording_url: Optional[str] = None, is_outbound: bool = False):
         ncco: List[Dict[str, Any]] = []
         if record:
-            if recording_url:
-                recording_url = f"{recording_url}/{conversation_id}"
-            else:
+            if not recording_url:
                 recording_url = f"https://{base_url}/recordings/{conversation_id}"
             ncco.append(
                 {

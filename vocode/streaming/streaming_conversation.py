@@ -200,7 +200,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
             if transcription.is_final:
                 self.conversation.customer_last_spoken_end_time = time.time()
-                self.conversation.agent_last_spoken_end_time = None
+                self.conversation.ready_to_publish_filler = True
+
                 asr_log = BaseLog(
                     conversation_id=self.conversation.id,
                     message="ASR: Final transcription.",
@@ -212,6 +213,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 if self.conversation.customer_last_spoken_start_time is None:
                     self.conversation.customer_last_spoken_start_time = time.time()
                 self.conversation.customer_last_spoken_end_time = None
+                self.conversation.ready_to_publish_filler = False
+
                 asr_log = BaseLog(
                     conversation_id=self.conversation.id,
                     message="ASR: Partial transcription.",
@@ -219,8 +222,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=transcription.message,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
-
-            self.conversation.ready_to_publish_filler = True
 
             if (
                 not self.conversation.is_human_speaking
@@ -304,7 +305,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                 self.conversation.agent_last_spoken_start_time = time.time()
                 self.conversation.agent_last_spoken_end_time = None
-                self.conversation.ready_to_publish_filler = True
+                self.conversation.ready_to_publish_filler = False
                 await self.conversation.send_speech_to_output(
                     filler_audio.message.text,
                     filler_synthesis_result,
@@ -313,6 +314,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     started_event=self.filler_audio_started_event,
                 )
                 self.conversation.agent_last_spoken_end_time = time.time()
+                self.conversation.ready_to_publish_filler = True
                 item.agent_response_tracker.set()
             except asyncio.CancelledError:
                 pass
@@ -445,7 +447,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.agent_last_spoken_start_time = time.time()
                 self.conversation.agent_last_spoken_end_time = None
-                self.conversation.ready_to_publish_filler = True
+                self.conversation.ready_to_publish_filler = False
                 message_sent, cut_off = await self.conversation.send_speech_to_output(
                     message.text,
                     synthesis_result,
@@ -454,6 +456,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     transcript_message=transcript_message,
                 )
                 self.conversation.agent_last_spoken_end_time = time.time()
+                self.conversation.ready_to_publish_filler = True
                 # publish the transcript message now that it includes what was said during send_speech_to_output
                 self.conversation.transcript.maybe_publish_transcript_event_from_message(
                     message=transcript_message,

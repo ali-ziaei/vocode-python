@@ -71,6 +71,7 @@ class VonageClient(BaseTelephonyClient):
         from_phone: str,
         record: bool = False,
         recording_url: Optional[str] = None,
+        events_url: Optional[str] = None,
         digits: Optional[str] = None,
     ) -> str:  # identifier of the call on the telephony provider
         return await self.create_vonage_call(
@@ -80,6 +81,7 @@ class VonageClient(BaseTelephonyClient):
                 self.base_url, conversation_id, record, recording_url, is_outbound=True
             ),
             digits,
+            event_urls=[events_url],
         )
 
     @staticmethod

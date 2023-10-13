@@ -117,6 +117,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
             ):
                 return
 
+            if self.conversation.agent_asks_for_more_time_trailing_sil_sec is None:
+                self.conversation.agent_asks_for_more_time_trailing_sil_sec = 0.8
+                self.conversation.logger(
+                    "FILLER: agent_asks_for_more_time_trailing_sil_sec == 0.8"
+                )
+
             current_time = time.time()
             filler_phrase = None
 
@@ -137,7 +143,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 filler_phrase = random.choice(
                     self.conversation.agent_asks_for_more_time_filler_phrases
                 )
-                await self.publish_filler(filler_phrase)
+
+                filler_ssml = (
+                    filler_phrase
+                    + f'<break time="{self.conversation.agent_asks_for_more_time_trailing_sil_sec}s"/>'
+                )
+                await self.publish_filler(filler_phrase, filler_ssml)
 
         async def publish_ask_speak_up_filler(self):
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
@@ -182,22 +193,26 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 await self.publish_filler(filler_phrase)
                 return
 
-        async def publish_filler(self, filler_phrase):
+        async def publish_filler(self, filler_text, filler_ssml: Optional[str] = None):
             self.conversation.events_manager.publish_event(
                 FillerEvent(
                     conversation_id=self.conversation.id,
-                    filler_phrase=filler_phrase,
+                    filler_phrase=filler_text,
                 )
             )
             self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
-                AgentResponseMessage(message=BaseMessage(text=filler_phrase)),
+                AgentResponseMessage(
+                    message=BaseMessage(
+                        text=filler_ssml if filler_ssml else filler_text
+                    )
+                ),
                 is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
             )
             filler_log = BaseLog(
                 conversation_id=self.conversation.id,
                 message="FILLER: Published filler.",
                 time_stamp=datetime.datetime.utcnow(),
-                text=filler_phrase,
+                text=filler_text,
             )
             self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
             self.conversation.spoken_metadata.ready_to_publish_filler = False
@@ -576,6 +591,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
         )
         self.agent_asks_for_speak_up_filler_phrases = (
             self.agent.get_agent_config().agent_asks_for_speak_up_filler_phrases
+        )
+        self.agent_asks_for_more_time_trailing_sil_sec = (
+            self.agent.get_agent_config().agent_asks_for_more_time_trailing_sil_sec
         )
 
         self.synthesizer = synthesizer

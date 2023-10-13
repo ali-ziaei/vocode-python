@@ -43,4 +43,4 @@ class ActionEvent(Event, type=EventType.ACTION):
 
 
 class FillerEvent(Event, type=EventType.PUBLISH_FILLER):
-    pass
+    filler_phrase: str

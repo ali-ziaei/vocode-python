@@ -132,7 +132,7 @@ class TelephonyServer:
             conversation_id = create_conversation_id()
             await self.config_manager.save_config(conversation_id, call_config)
             return self.templater.get_connection_twiml(
-                base_url=self.base_url, call_id=conversation_id, status_callback=twilio_config.status_callback_url
+                base_url=self.base_url, call_id=conversation_id
             )
 
         async def vonage_route(

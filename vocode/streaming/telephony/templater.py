@@ -13,8 +13,8 @@ class Templater:
         template = self.templates.get_template(template_name)
         return template.render(**kwargs)
 
-    def get_connection_twiml(self, call_id: str, base_url: str, status_callback: str):
+    def get_connection_twiml(self, call_id: str, base_url: str):
         return Response(
-        self.render_template("connect_call.xml", base_url=base_url, id=call_id, status_callback=status_callback),
+        self.render_template("connect_call.xml", base_url=base_url, id=call_id),
             media_type="application/xml",
         )

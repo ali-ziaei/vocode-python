@@ -28,7 +28,6 @@ class TwilioConfig(BaseModel):
     auth_token: str
     record: bool = False
     recording_url: Optional[str] = None
-    status_callback_url: Optional[str] = None
     extra_params: Optional[Dict[str, Any]] = {}
 
 

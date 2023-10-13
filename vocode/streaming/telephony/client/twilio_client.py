@@ -31,6 +31,7 @@ class TwilioClient(BaseTelephonyClient):
         from_phone: str,
         record: bool = False,
         recording_url: Optional[str] = None,
+        events_url: Optional[str] = None,
         digits: Optional[str] = None,
     ) -> str:
         # TODO: Make this async. This is blocking.
@@ -42,6 +43,7 @@ class TwilioClient(BaseTelephonyClient):
             send_digits=digits,
             record=record,
             recording_status_callback=recording_url,
+            status_callback=events_url,
             **self.get_telephony_config().extra_params,
         )
         return twilio_call.sid

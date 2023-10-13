@@ -107,6 +107,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
 
         async def publish_ask_more_time_filler(self):
+            # when agent or customer are speaking, we return
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
                 return
 
@@ -125,7 +126,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if self.conversation.spoken_metadata.agent_last_spoken_end_time is None:
                 return
 
-            # case 1: agent need more time
+            # case 1: agent need more time (we make sure agent is spoken last)
             if (
                 self.conversation.spoken_metadata.customer_last_spoken_end_time
                 > self.conversation.spoken_metadata.agent_last_spoken_end_time
@@ -155,6 +156,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             filler_phrase = None
 
             # case 2: agent ask customer to speak
+            # if customer has not spoken at all (after greeting)
             if self.conversation.spoken_metadata.customer_last_spoken_end_time is None:
                 if (
                     current_time

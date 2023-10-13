@@ -144,12 +144,10 @@ class OutboundCall:
             to_phone=self.to_phone,
             from_phone=self.from_phone,
             record=self.telephony_client.get_telephony_config().record,
+            recording_url=(f"{self.telephony_client.get_telephony_config().recording_url}/{self.conversation_id}"),
+            events_url=self.telephony_client.get_telephony_config().events_url,
             digits=self.digits,
         )
-        self.redis_client.setex(
-            name=f"csid_{self.telephony_id}",
-            value=self.conversation_id,
-            time=86400)
 
         if isinstance(self.telephony_client, TwilioClient):
             call_config = TwilioCallConfig(

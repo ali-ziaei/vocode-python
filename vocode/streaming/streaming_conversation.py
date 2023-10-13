@@ -122,12 +122,19 @@ class StreamingConversation(Generic[OutputDeviceType]):
             # case 1: agent need more time
             if self.conversation.spoken_metadata.agent_last_spoken_end_time:
                 if (
+                    self.conversation.spoken_metadata.customer_last_spoken_end_time
+                    and self.conversation.spoken_metadata.customer_last_spoken_end_time
+                    < self.conversation.spoken_metadata.agent_last_spoken_end_time
+                ):
+                    return
+
+                if (
                     current_time
                     - self.conversation.spoken_metadata.agent_last_spoken_end_time
-                    > self.conversation.agent_asks_for_speak_up_threshold_sec
+                    > self.conversation.agent_asks_for_more_time_threshold_sec
                 ):
                     filler_phrase = random.choice(
-                        self.conversation.agent_asks_for_speak_up_filler_phrases
+                        self.conversation.agent_asks_for_more_time_filler_phrases
                     )
                     await self.publish_filler(filler_phrase)
 
@@ -147,12 +154,19 @@ class StreamingConversation(Generic[OutputDeviceType]):
             # case 2: agent ask customer to speak
             if self.conversation.spoken_metadata.customer_last_spoken_end_time:
                 if (
+                    self.conversation.spoken_metadata.agent_last_spoken_end_time
+                    and self.conversation.spoken_metadata.agent_last_spoken_end_time
+                    < self.conversation.spoken_metadata.customer_last_spoken_end_time
+                ):
+                    return
+
+                if (
                     current_time
                     - self.conversation.spoken_metadata.customer_last_spoken_end_time
-                    > self.conversation.agent_asks_for_more_time_threshold_sec
+                    > self.conversation.agent_asks_for_speak_up_threshold_sec
                 ):
                     filler_phrase = random.choice(
-                        self.conversation.agent_asks_for_more_time_filler_phrases
+                        self.conversation.agent_asks_for_speak_up_filler_phrases
                     )
                     await self.publish_filler(filler_phrase)
 

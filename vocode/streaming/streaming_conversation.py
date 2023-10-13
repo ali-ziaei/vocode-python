@@ -107,42 +107,53 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
 
+        async def publish_fillers(self):
+            if not (
+                self.conversation.agent_asks_for_more_time_filler_phrases
+                and self.conversation.agent_asks_for_more_time_threshold_sec
+            ):
+                return
+
+            if not (
+                self.conversation.agent_asks_for_speak_up_filler_phrases
+                and self.conversation.agent_asks_for_speak_up_threshold_sec
+            ):
+                return
+
+            current_time = time.time()
+            if (
+                current_time - self.conversation.customer_last_spoken_time
+                >= self.conversation.agent_asks_for_more_time_threshold_sec
+            ):
+                if self.conversation.agent_last_spoken_time < current_time:
+                    filler_phrase = random.choice(
+                        self.conversation.agent_asks_for_more_time_filler_phrases
+                    )
+                    self.conversation.events_manager.publish_event(
+                        FillerEvent(
+                            conversation_id=self.conversation.id,
+                            filler_phrase=filler_phrase,
+                        )
+                    )
+
+            if (
+                current_time - self.conversation.agent_last_spoken_time
+                >= self.conversation.agent_asks_for_speak_up_threshold_sec
+            ):
+                if self.conversation.customer_last_spoken_time < current_time:
+                    filler_phrase = random.choice(
+                        self.conversation.agent_asks_for_speak_up_filler_phrases
+                    )
+                    self.conversation.events_manager.publish_event(
+                        FillerEvent(
+                            conversation_id=self.conversation.id,
+                            filler_phrase=filler_phrase,
+                        )
+                    )
+
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
-            if (
-                self.conversation.agent_asks_for_more_time_threshold_sec
-                and self.conversation.agent_asks_for_more_time_filler_phrases
-            ):
-                current_time = time.time()
-                if (
-                    current_time - self.conversation.customer_last_spoken_time
-                    >= self.conversation.agent_asks_for_more_time_threshold_sec
-                ):
-                    if self.conversation.agent_last_spoken_time < current_time:
-                        filler_phrase = random.choice(
-                            self.conversation.agent_asks_for_more_time_filler_phrases
-                        )
-                        self.conversation.events_manager.publish_event(
-                            FillerEvent(
-                                conversation_id=self.conversation.id,
-                                filler_phrase=filler_phrase,
-                            )
-                        )
-
-                if (
-                    current_time - self.conversation.agent_last_spoken_time
-                    >= self.conversation.agent_asks_for_speak_up_threshold_sec
-                ):
-                    if self.conversation.customer_last_spoken_time < current_time:
-                        filler_phrase = random.choice(
-                            self.conversation.agent_asks_for_speak_up_filler_phrases
-                        )
-                        self.conversation.events_manager.publish_event(
-                            FillerEvent(
-                                conversation_id=self.conversation.id,
-                                filler_phrase=filler_phrase,
-                            )
-                        )
+            await self.publish_fillers()
 
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed

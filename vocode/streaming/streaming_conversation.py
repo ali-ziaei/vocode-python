@@ -472,6 +472,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
             conversation_id=self.id,
         )
 
+        self.echo_mode = echo_mode
+        self.output_device = output_device
+        self.audio_service = audio_service
+        self.transcriber = transcriber
+        self.agent = agent
+
         # initiate filler pause tracking
         self.customer_last_spoken_time = None
         self.agent_last_spoken_time = None
@@ -488,11 +494,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.agent.get_agent_config().agent_asks_for_speak_up_filler_phrases
         )
 
-        self.echo_mode = echo_mode
-        self.output_device = output_device
-        self.audio_service = audio_service
-        self.transcriber = transcriber
-        self.agent = agent
         self.synthesizer = synthesizer
         self.synthesis_enabled = True
 

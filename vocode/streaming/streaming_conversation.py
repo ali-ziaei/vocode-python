@@ -108,6 +108,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
 
         async def publish_fillers(self):
+            if not self.conversation.ready_to_publish_filler:
+                return
+
             if not (
                 self.conversation.agent_asks_for_more_time_filler_phrases
                 and self.conversation.agent_asks_for_more_time_threshold_sec
@@ -167,6 +170,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             ),
                             is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
                         )
+                        self.conversation.ready_to_publish_filler = False
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -215,6 +219,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=transcription.message,
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+
+            self.conversation.ready_to_publish_filler = True
 
             if (
                 not self.conversation.is_human_speaking
@@ -298,6 +304,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                 self.conversation.agent_last_spoken_start_time = time.time()
                 self.conversation.agent_last_spoken_end_time = None
+                self.conversation.ready_to_publish_filler = True
                 await self.conversation.send_speech_to_output(
                     filler_audio.message.text,
                     filler_synthesis_result,
@@ -438,6 +445,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.agent_last_spoken_start_time = time.time()
                 self.conversation.agent_last_spoken_end_time = None
+                self.conversation.ready_to_publish_filler = True
                 message_sent, cut_off = await self.conversation.send_speech_to_output(
                     message.text,
                     synthesis_result,
@@ -510,6 +518,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.customer_last_spoken_end_time = None
         self.agent_last_spoken_start_time = None
         self.agent_last_spoken_end_time = None
+        self.ready_to_publish_filler = True
 
         self.agent_asks_for_more_time_threshold_sec = (
             self.agent.get_agent_config().agent_asks_for_more_time_threshold_sec

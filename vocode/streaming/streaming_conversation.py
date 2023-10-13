@@ -32,7 +32,7 @@ from vocode.streaming.constants import (
 from vocode.streaming.models.actions import ActionInput
 from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
 from vocode.streaming.models.audio import AudioServiceConfig
-from vocode.streaming.models.events import Sender
+from vocode.streaming.models.events import Sender, FillerEvent, SpokenMetaData
 from vocode.streaming.models.log_message import BaseLog
 from vocode.streaming.models.message import BaseMessage
 from vocode.streaming.models.synthesizer import SentimentConfig
@@ -99,13 +99,113 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self,
             input_queue: asyncio.Queue[bytes],
             output_queue: asyncio.Queue[bytes],
+            conversation: "StreamingConversation",
         ):
             super().__init__(input_queue, output_queue)
             self.input_queue = input_queue
             self.output_queue = output_queue
+            self.conversation = conversation
+
+        async def publish_ask_more_time_filler(self):
+            # when agent or customer are speaking, we return
+            if not self.conversation.spoken_metadata.ready_to_publish_filler:
+                return
+
+            if not (
+                self.conversation.agent_asks_for_more_time_filler_phrases
+                and self.conversation.agent_asks_for_more_time_threshold_sec
+            ):
+                return
+
+            current_time = time.time()
+            filler_phrase = None
+
+            if self.conversation.spoken_metadata.customer_last_spoken_end_time is None:
+                return
+
+            if self.conversation.spoken_metadata.agent_last_spoken_end_time is None:
+                return
+
+            # case 1: agent need more time (we make sure agent is spoken last)
+            if (
+                self.conversation.spoken_metadata.customer_last_spoken_end_time
+                > self.conversation.spoken_metadata.agent_last_spoken_end_time
+                and current_time
+                - self.conversation.spoken_metadata.customer_last_spoken_end_time
+                > self.conversation.agent_asks_for_more_time_threshold_sec
+            ):
+                filler_phrase = random.choice(
+                    self.conversation.agent_asks_for_more_time_filler_phrases
+                )
+                await self.publish_filler(filler_phrase)
+
+        async def publish_ask_speak_up_filler(self):
+            if not self.conversation.spoken_metadata.ready_to_publish_filler:
+                return
+
+            if not (
+                self.conversation.agent_asks_for_speak_up_filler_phrases
+                and self.conversation.agent_asks_for_speak_up_threshold_sec
+            ):
+                return
+
+            if self.conversation.spoken_metadata.agent_last_spoken_end_time is None:
+                return
+
+            current_time = time.time()
+            filler_phrase = None
+
+            # case 2: agent ask customer to speak
+            # if customer has not spoken at all (after greeting)
+            if self.conversation.spoken_metadata.customer_last_spoken_end_time is None:
+                if (
+                    current_time
+                    - self.conversation.spoken_metadata.agent_last_spoken_end_time
+                    > self.conversation.agent_asks_for_speak_up_threshold_sec
+                ):
+                    filler_phrase = random.choice(
+                        self.conversation.agent_asks_for_speak_up_filler_phrases
+                    )
+                    await self.publish_filler(filler_phrase)
+                    return
+
+            if (
+                current_time
+                - self.conversation.spoken_metadata.agent_last_spoken_end_time
+                > self.conversation.agent_asks_for_speak_up_threshold_sec
+                and self.conversation.spoken_metadata.agent_last_spoken_end_time
+                > self.conversation.spoken_metadata.customer_last_spoken_end_time
+            ):
+                filler_phrase = random.choice(
+                    self.conversation.agent_asks_for_speak_up_filler_phrases
+                )
+                await self.publish_filler(filler_phrase)
+                return
+
+        async def publish_filler(self, filler_phrase):
+            self.conversation.events_manager.publish_event(
+                FillerEvent(
+                    conversation_id=self.conversation.id,
+                    filler_phrase=filler_phrase,
+                )
+            )
+            self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
+                AgentResponseMessage(message=BaseMessage(text=filler_phrase)),
+                is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
+            )
+            filler_log = BaseLog(
+                conversation_id=self.conversation.id,
+                message="FILLER: Published filler.",
+                time_stamp=datetime.datetime.utcnow(),
+                text=filler_phrase,
+            )
+            self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
+            self.conversation.spoken_metadata.ready_to_publish_filler = False
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
+            await self.publish_ask_more_time_filler()
+            await self.publish_ask_speak_up_filler()
 
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed
@@ -123,6 +223,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
+            self.start_speaking = False
 
         async def process(self, transcription: Transcription):
             self.conversation.mark_last_action_timestamp()
@@ -130,19 +231,33 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.logger.info("Ignoring empty transcription")
                 return
             if transcription.is_final:
+                self.start_speaking = False
+                self.conversation.spoken_metadata.customer_last_spoken_end_time = (
+                    time.time()
+                )
+                self.conversation.spoken_metadata.ready_to_publish_filler = True
+
                 asr_log = BaseLog(
                     conversation_id=self.conversation.id,
                     message="ASR: Final transcription.",
                     time_stamp=datetime.datetime.utcnow(),
-                    text=transcription.message,
+                    text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             else:
+                if not self.start_speaking:
+                    self.conversation.spoken_metadata.customer_last_spoken_start_time = (
+                        time.time()
+                    )
+                self.start_speaking = True
+                self.conversation.spoken_metadata.customer_last_spoken_end_time = None
+                self.conversation.spoken_metadata.ready_to_publish_filler = False
+
                 asr_log = BaseLog(
                     conversation_id=self.conversation.id,
                     message="ASR: Partial transcription.",
                     time_stamp=datetime.datetime.utcnow(),
-                    text=transcription.message,
+                    text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
 
@@ -225,6 +340,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 await asyncio.sleep(silence_threshold)
                 self.conversation.logger.debug("Sending filler audio to output")
                 self.filler_audio_started_event = threading.Event()
+
+                self.conversation.spoken_metadata.agent_last_spoken_start_time = (
+                    time.time()
+                )
+                self.conversation.spoken_metadata.agent_last_spoken_end_time = None
+                self.conversation.spoken_metadata.ready_to_publish_filler = False
                 await self.conversation.send_speech_to_output(
                     filler_audio.message.text,
                     filler_synthesis_result,
@@ -232,6 +353,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     filler_audio.seconds_per_chunk,
                     started_event=self.filler_audio_started_event,
                 )
+                self.conversation.spoken_metadata.agent_last_spoken_end_time = (
+                    time.time()
+                )
+                self.conversation.spoken_metadata.ready_to_publish_filler = True
                 item.agent_response_tracker.set()
             except asyncio.CancelledError:
                 pass
@@ -362,6 +487,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                     publish_to_events_manager=False,
                 )
+                self.conversation.spoken_metadata.agent_last_spoken_start_time = (
+                    time.time()
+                )
+                self.conversation.spoken_metadata.agent_last_spoken_end_time = None
+                self.conversation.spoken_metadata.ready_to_publish_filler = False
                 message_sent, cut_off = await self.conversation.send_speech_to_output(
                     message.text,
                     synthesis_result,
@@ -369,6 +499,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.synthesizer.get_synthesizer_config().text_to_speech_chunk_size_seconds,
                     transcript_message=transcript_message,
                 )
+                self.conversation.spoken_metadata.agent_last_spoken_end_time = (
+                    time.time()
+                )
+                self.conversation.spoken_metadata.ready_to_publish_filler = True
                 # publish the transcript message now that it includes what was said during send_speech_to_output
                 self.conversation.transcript.maybe_publish_transcript_event_from_message(
                     message=transcript_message,
@@ -421,11 +555,29 @@ class StreamingConversation(Generic[OutputDeviceType]):
             logger or logging.getLogger(__name__),
             conversation_id=self.id,
         )
+
         self.echo_mode = echo_mode
         self.output_device = output_device
         self.audio_service = audio_service
         self.transcriber = transcriber
         self.agent = agent
+
+        # initiate filler pause tracking
+        self.spoken_metadata = SpokenMetaData()
+
+        self.agent_asks_for_more_time_threshold_sec = (
+            self.agent.get_agent_config().agent_asks_for_more_time_threshold_sec
+        )
+        self.agent_asks_for_speak_up_threshold_sec = (
+            self.agent.get_agent_config().agent_asks_for_speak_up_threshold_sec
+        )
+        self.agent_asks_for_more_time_filler_phrases = (
+            self.agent.get_agent_config().agent_asks_for_more_time_filler_phrases
+        )
+        self.agent_asks_for_speak_up_filler_phrases = (
+            self.agent.get_agent_config().agent_asks_for_speak_up_filler_phrases
+        )
+
         self.synthesizer = synthesizer
         self.synthesis_enabled = True
 
@@ -445,6 +597,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.audio_service_worker = self.AudioServiceWorker(
             input_queue=self.audio_service.output_queue,
             output_queue=self.transcriber.input_queue,
+            conversation=self,
         )
 
         self.transcriptions_worker = self.TranscriptionsWorker(

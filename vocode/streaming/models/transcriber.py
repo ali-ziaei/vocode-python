@@ -109,6 +109,7 @@ class DeepgramTranscriberConfig(TranscriberConfig, type=TranscriberType.DEEPGRAM
     tier: Optional[str] = None
     version: Optional[str] = None
     keywords: Optional[list] = None
+    smart_format: Optional[bool] = None
 
 
 class GladiaTranscriberConfig(TranscriberConfig, type=TranscriberType.GLADIA.value):

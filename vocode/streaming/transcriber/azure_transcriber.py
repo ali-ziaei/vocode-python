@@ -74,54 +74,60 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         else:
             speech_params["language"] = self.transcriber_config.language
 
-        if transcriber_config.stable_partial_result_threshold:
+        if self.transcriber_config.stable_partial_result_threshold:
             speech_config.set_property(
                 property_id=speechsdk.PropertyId.SpeechServiceResponse_StablePartialResultThreshold,  # pylint: disable=line-too-long
                 value=str(self.transcriber_config.stable_partial_result_threshold),
             )
 
-        if transcriber_config.segmentation_sil_timeout:
+        if self.transcriber_config.segmentation_sil_timeout:
             speech_config.set_property(
                 property_id=speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,
                 value=str(self.transcriber_config.segmentation_sil_timeout),
             )
 
-        if transcriber_config.end_sil_timeout:
+        if self.transcriber_config.end_sil_timeout:
             speech_config.set_property(
                 property_id=speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,  # pylint: disable=line-too-long
                 value=str(self.transcriber_config.end_sil_timeout),
             )
 
-        if transcriber_config.enable_dictation:
+        if self.transcriber_config.enable_dictation:
             speech_config.enable_dictation()
 
         self.speech = speechsdk.SpeechRecognizer(**speech_params)
 
-        if transcriber_config.phrases:
+        if self.transcriber_config.phrases:
             speech_phrase_list_grammer = speechsdk.PhraseListGrammar.from_recognizer(
                 self.speech
             )
-            for phrase in transcriber_config.phrases:
+            for phrase in self.transcriber_config.phrases:
                 speech_phrase_list_grammer.addPhrase(phrase)
 
         self._ended = False
         self.is_ready = False
 
     def recognized_sentence_final(self, evt):
+        start = evt.result.offset / 1e7
+        duration = evt.result.duration / 1e7
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=True,
+                latency=self.audio_cursor - (start + duration),
             )
         )
 
     def recognized_sentence_stream(self, evt):
+        start = evt.result.offset / 1e7
+        duration = evt.result.duration / 1e7
         self.output_janus_queue.sync_q.put_nowait(
             Transcription(
                 message=evt.result.text,
                 confidence=1.0,
                 is_final=False,
+                latency=self.audio_cursor - (start + duration),
             )
         )
 
@@ -148,10 +154,17 @@ class AzureTranscriber(BaseThreadAsyncTranscriber[AzureTranscriberConfig]):
         self.speech.session_stopped.connect(stop_cb)
         self.speech.canceled.connect(stop_cb)
         self.speech.start_continuous_recognition_async()
+        num_channels = 1
+        sample_width = (
+            1 if self.transcriber_config.audio_encoding == AudioEncoding.MULAW else 2
+        )
 
         for content in stream:
             if self.initial_time is None and content:
                 self.initial_time = datetime.datetime.utcnow()
+            self.audio_cursor += len(content) / (
+                self.transcriber_config.sampling_rate * num_channels * sample_width
+            )
             self.push_stream.write(content)
             if self._ended:
                 break

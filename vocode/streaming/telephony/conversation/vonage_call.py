@@ -82,7 +82,7 @@ class VonageCall(Call[VonageOutputDevice]):
         self.config_manager = config_manager
         self.echo_mode = echo_mode
         if vonage_config:
-            self.vonage_config = self.vonage_config.copy(deep=True)
+            self.vonage_config = vonage_config.copy(deep=True)
             self.vonage_config.recording_url = f"{vonage_config.recording_url}/{conversation_id}"
         else:
             self.vonage_config = VonageConfig(

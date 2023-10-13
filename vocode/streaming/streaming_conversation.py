@@ -129,7 +129,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     filler_phrase = random.choice(
                         self.conversation.agent_asks_for_speak_up_filler_phrases
                     )
-                    self.publish_filler(filler_phrase)
+                    await self.publish_filler(filler_phrase)
 
         async def publish_ask_speak_up_filler(self):
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
@@ -154,7 +154,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     filler_phrase = random.choice(
                         self.conversation.agent_asks_for_more_time_filler_phrases
                     )
-                    self.publish_filler(filler_phrase)
+                    await self.publish_filler(filler_phrase)
 
         async def publish_filler(self, filler_phrase):
             self.conversation.events_manager.publish_event(

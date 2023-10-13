@@ -1,6 +1,10 @@
 from fastapi import WebSocket, WebSocketDisconnect
 import logging
+import os
 from typing import Optional
+
+from redis import Redis
+
 from vocode import getenv
 from vocode.streaming.agent.factory import AgentFactory
 from vocode.streaming.models.agent import AgentConfig
@@ -90,6 +94,11 @@ class VonageCall(Call[VonageOutputDevice]):
             base_url=base_url, vonage_config=self.vonage_config
         )
         self.vonage_uuid = vonage_uuid
+        redis_client = Redis(
+            host=os.environ.get("REDISHOST", "localhost"),
+            port=int(os.environ.get("REDISPORT", 6379)),
+        )
+        redis_client.setex(name=f"csid_{vonage_uuid}", value=conversation_id, time=86400)
         if output_to_speaker:
             self.output_speaker = SpeakerOutput.from_default_device(
                 sampling_rate=VONAGE_SAMPLING_RATE, blocksize=VONAGE_CHUNK_SIZE // 2

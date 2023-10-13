@@ -72,6 +72,10 @@ class AgentConfig(TypedModel, type=AgentType.BASE.value):
     webhook_config: Optional[WebhookConfig] = None
     track_bot_sentiment: bool = False
     actions: Optional[List[ActionConfig]] = None
+    agent_asks_for_more_time_threshold_sec: Optional[float] = None
+    agent_asks_for_speak_up_threshold_sec: Optional[float] = None
+    agent_asks_for_more_time_filler_phrases: Optional[List[str]] = None
+    agent_asks_for_speak_up_filler_phrases: Optional[List[str]] = None
 
 
 class CutOffResponse(BaseModel):

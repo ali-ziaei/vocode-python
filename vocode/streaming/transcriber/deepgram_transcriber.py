@@ -53,7 +53,9 @@ class DeepgramTranscriber(BaseAsyncTranscriber[DeepgramTranscriberConfig]):
         logger: Optional[logging.Logger] = None,
     ):
         super().__init__(transcriber_config)
-        self.api_key = api_key or getenv("DEEPGRAM_API_KEY")
+        self.api_key = (
+            api_key or transcriber_config.speech_key or getenv("DEEPGRAM_API_KEY")
+        )
         if not self.api_key:
             raise Exception(
                 "Please set DEEPGRAM_API_KEY environment variable or pass it as a parameter"
@@ -116,12 +118,15 @@ class DeepgramTranscriber(BaseAsyncTranscriber[DeepgramTranscriberConfig]):
             extra_params["version"] = self.transcriber_config.version
         if self.transcriber_config.keywords:
             extra_params["keywords"] = self.transcriber_config.keywords
-        if (
-            self.transcriber_config.endpointing_config
-            and self.transcriber_config.endpointing_config.type
-            == EndpointingType.PUNCTUATION_BASED
-        ):
-            extra_params["punctuate"] = "true"
+        if self.transcriber_config.smart_format:
+            extra_params["smart_format"] = "true"
+        else:
+            if (
+                self.transcriber_config.endpointing_config
+                and self.transcriber_config.endpointing_config.type
+                == EndpointingType.PUNCTUATION_BASED
+            ):
+                extra_params["punctuate"] = "true"
         url_params.update(extra_params)
         return f"wss://api.deepgram.com/v1/listen?{urlencode(url_params)}"
 
@@ -182,7 +187,11 @@ class DeepgramTranscriber(BaseAsyncTranscriber[DeepgramTranscriberConfig]):
                     except asyncio.exceptions.TimeoutError:
                         break
                     num_channels = 1
-                    sample_width = 2
+                    sample_width = (
+                        1
+                        if self.transcriber_config.audio_encoding == AudioEncoding.MULAW
+                        else 2
+                    )
                     self.audio_cursor += len(data) / (
                         self.transcriber_config.sampling_rate
                         * num_channels
@@ -243,6 +252,7 @@ class DeepgramTranscriber(BaseAsyncTranscriber[DeepgramTranscriberConfig]):
                                 message=buffer,
                                 confidence=buffer_avg_confidence,
                                 is_final=True,
+                                latency=cur_min_latency,
                             )
                         )
                         buffer = ""
@@ -255,6 +265,7 @@ class DeepgramTranscriber(BaseAsyncTranscriber[DeepgramTranscriberConfig]):
                                 message=buffer,
                                 confidence=confidence,
                                 is_final=False,
+                                latency=cur_min_latency,
                             )
                         )
                         time_silent = self.calculate_time_silent(data)

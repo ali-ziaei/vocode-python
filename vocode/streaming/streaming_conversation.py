@@ -565,7 +565,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                         text=self.conversation.agent_filler_config.ask_more_time.terminate_call_phrase
                                     )
                                 )
-                            else:
                                 await self.conversation.terminate()
 
                 # terminate call if multiple retry happens
@@ -588,7 +587,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                         text=self.conversation.agent_filler_config.speak_up.terminate_call_phrase
                                     )
                                 )
-                            else:
                                 await self.conversation.terminate()
 
                 if cut_off:

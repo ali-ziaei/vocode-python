@@ -8,6 +8,8 @@ from vocode.streaming.models.actions import ActionConfig
 from vocode.streaming.models.message import BaseMessage
 from .model import TypedModel, BaseModel
 from .vector_db import VectorDBConfig
+from dataclasses import dataclass
+from mashumaro import DataClassDictMixin
 
 FILLER_AUDIO_DEFAULT_SILENCE_THRESHOLD_SECONDS = 0.5
 LLM_AGENT_DEFAULT_TEMPERATURE = 1.0
@@ -62,6 +64,30 @@ class AzureOpenAIConfig(BaseModel):
     engine: str = AZURE_OPENAI_DEFAULT_ENGINE
 
 
+@dataclass
+class AgentAskMoreTimeFillerConfig(DataClassDictMixin):
+    threshold_sec: Optional[float] = None
+    filler_phrases: Optional[List[str]] = None
+    trailing_silence: Optional[float] = None
+    retry_before_terminate_the_call: Optional[int] = None
+    terminate_call_phrase: Optional[str] = None
+
+
+@dataclass
+class AgentSpeakUpFillerConfig(DataClassDictMixin):
+    threshold_sec: Optional[float] = None
+    filler_phrases: Optional[List[str]] = None
+    trailing_silence: Optional[float] = None
+    retry_before_terminate_the_call: Optional[int] = None
+    terminate_call_phrase: Optional[str] = None
+
+
+@dataclass
+class AgentFillerConfig(DataClassDictMixin):
+    ask_more_time: Optional[AgentAskMoreTimeFillerConfig] = None
+    speak_up: Optional[AgentSpeakUpFillerConfig] = None
+
+
 class AgentConfig(TypedModel, type=AgentType.BASE.value):
     initial_message: Optional[BaseMessage] = None
     generate_responses: bool = True
@@ -72,11 +98,7 @@ class AgentConfig(TypedModel, type=AgentType.BASE.value):
     webhook_config: Optional[WebhookConfig] = None
     track_bot_sentiment: bool = False
     actions: Optional[List[ActionConfig]] = None
-    agent_asks_for_more_time_threshold_sec: Optional[float] = None
-    agent_asks_for_speak_up_threshold_sec: Optional[float] = None
-    agent_asks_for_more_time_filler_phrases: Optional[List[str]] = None
-    agent_asks_for_speak_up_filler_phrases: Optional[List[str]] = None
-    agent_asks_for_more_time_trailing_sil_sec: Optional[float] = None
+    agent_filler_config: Optional[AgentFillerConfig] = None
 
 
 class CutOffResponse(BaseModel):

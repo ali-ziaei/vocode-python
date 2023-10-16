@@ -203,8 +203,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
                 AgentResponseMessage(
                     message=BaseMessage(
-                        text=filler_ssml if filler_ssml else filler_text
-                    )
+                        text=filler_ssml if filler_ssml else filler_text,
+                        hard_coded=True,
+                    ),
                 ),
                 is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
             )
@@ -535,6 +536,37 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
                     )
+
+                if (
+                    self.conversation.agent_asks_for_more_time_retry_before_terminate
+                    and self.conversation.agent_terminate_call_phrase
+                ):
+                    # check how many times we played hard coded filler
+                    if message.hard_coded:
+                        self.conversation.agent_asks_for_more_time_retry_in_row_so_far += (
+                            1
+                        )
+                    else:
+                        self.conversation.agent_asks_for_more_time_retry_in_row_so_far = (
+                            0
+                        )
+
+                    if (
+                        self.conversation.agent_asks_for_more_time_retry_in_row_so_far
+                        >= self.conversation.agent_asks_for_more_time_retry_before_terminate
+                    ):
+                        self.conversation.transcriber.mute()
+                        if (
+                            self.conversation.agent_asks_for_more_time_retry_in_row_so_far
+                            == self.conversation.agent_asks_for_more_time_retry_before_terminate
+                        ):
+                            # play back terminate phrase
+                            await self.conversation.audio_service_worker.publish_filler(
+                                self.conversation.agent_terminate_call_phrase
+                            )
+                        else:
+                            await self.terminate()
+
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (
                         self.conversation.agent.create_goodbye_detection_task(
@@ -602,6 +634,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.agent_terminate_call_phrase = (
             self.agent.get_agent_config().agent_terminate_call_phrase
         )
+        self.agent_asks_for_more_time_retry_in_row_so_far = 0
 
         self.synthesizer = synthesizer
         self.synthesis_enabled = True

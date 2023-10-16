@@ -146,9 +146,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     await self.publish_filler(
                         SSMLMessage(text=filler_phrase, ssml=filler_ssml)
                     )
+                    self.conversation.num_retry_ask_more_time_in_row += 1
                     return
 
                 await self.publish_filler(BaseMessage(text=filler_phrase))
+                self.conversation.num_retry_ask_more_time_in_row += 1
                 return
 
         async def publish_ask_speak_up_filler(self):
@@ -187,9 +189,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         await self.publish_filler(
                             SSMLMessage(text=filler_phrase, ssml=filler_ssml)
                         )
+                        self.conversation.num_retry_speak_up_in_row += 1
                         return
 
                     await self.publish_filler(BaseMessage(text=filler_phrase))
+                    self.conversation.num_retry_speak_up_in_row += 1
                     return
 
             if (
@@ -203,6 +207,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.agent_filler_config.speak_up.filler_phrases
                 )
                 await self.publish_filler(BaseMessage(text=filler_phrase))
+                self.conversation.num_retry_speak_up_in_row += 1
                 return
 
         async def publish_filler(self, filler_message: BaseMessage):
@@ -539,6 +544,53 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=message_sent,
                 )
                 self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
+
+                # terminate call if multiple retry happens
+                if self.conversation.agent_filler_config.ask_more_time:
+                    if (
+                        self.conversation.agent_filler_config.ask_more_time.retry_before_terminate_the_call
+                        >= 1
+                    ):
+                        if (
+                            self.conversation.num_retry_ask_more_time_in_row
+                            >= self.conversation.agent_filler_config.ask_more_time.retry_before_terminate_the_call
+                        ):
+                            if (
+                                self.conversation.num_retry_ask_more_time_in_row
+                                == self.conversation.agent_filler_config.ask_more_time.retry_before_terminate_the_call
+                            ):
+                                self.conversation.transcriber.mute()
+                                await self.conversation.audio_service_worker.publish_filler(
+                                    BaseMessage(
+                                        text=self.conversation.agent_filler_config.ask_more_time.terminate_call_phrase
+                                    )
+                                )
+                            else:
+                                await self.conversation.terminate()
+
+                # terminate call if multiple retry happens
+                if self.conversation.agent_filler_config.speak_up:
+                    if (
+                        self.conversation.agent_filler_config.speak_up.retry_before_terminate_the_call
+                        >= 1
+                    ):
+                        if (
+                            self.conversation.num_retry_speak_up_in_row
+                            >= self.conversation.agent_filler_config.speak_up.retry_before_terminate_the_call
+                        ):
+                            if (
+                                self.conversation.num_retry_speak_up_in_row
+                                == self.conversation.agent_filler_config.speak_up.retry_before_terminate_the_call
+                            ):
+                                self.conversation.transcriber.mute()
+                                await self.conversation.audio_service_worker.publish_filler(
+                                    BaseMessage(
+                                        text=self.conversation.agent_filler_config.speak_up.terminate_call_phrase
+                                    )
+                                )
+                            else:
+                                await self.conversation.terminate()
+
                 if cut_off:
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
@@ -590,6 +642,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.spoken_metadata = SpokenMetaData()
 
         self.agent_filler_config = self.agent.get_agent_config().agent_filler_config
+        self.num_retry_ask_more_time_in_row = 0
+        self.num_retry_speak_up_in_row = 0
 
         self.synthesizer = synthesizer
         self.synthesis_enabled = True

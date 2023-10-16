@@ -18,7 +18,7 @@ from vocode.streaming.models.synthesizer import (
     SynthesizerType,
 )
 from vocode.streaming.agent.bot_sentiment_analyser import BotSentiment
-from vocode.streaming.models.message import BaseMessage
+from vocode.streaming.models.message import BaseMessage, SSMLMessage
 from vocode.streaming.utils.mp3_helper import decode_mp3
 from vocode.streaming.synthesizer.miniaudio_worker import MiniaudioWorker
 from vocode.streaming.models.log_message import BaseLog
@@ -68,7 +68,9 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 stability=self.stability, similarity_boost=self.similarity_boost
             )
 
-        cache_key = self.get_cache_key(message.text)
+        text = message.ssml if isinstance(message, SSMLMessage) else message.text
+
+        cache_key = self.get_cache_key(text)
         audio_data = self.cache.get(cache_key)
 
         if audio_data is not None:
@@ -76,7 +78,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech -> found in Redis.",
                 time_stamp=datetime.datetime.utcnow(),
-                text=message.text,
+                text=text,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -85,7 +87,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech -> calling API.",
                 time_stamp=datetime.datetime.utcnow(),
-                text=message.text,
+                text=text,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -97,7 +99,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 url += f"?optimize_streaming_latency={self.optimize_streaming_latency}"
             headers = {"xi-api-key": self.api_key}
             body = {
-                "text": message.text,
+                "text": text,
                 "voice_settings": voice.settings.dict() if voice.settings else None,
             }
             if self.model_id:
@@ -125,7 +127,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech, called API -> Got api response.",
                 time_stamp=datetime.datetime.utcnow(),
-                text=message.text,
+                text=text,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -143,7 +145,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                     conversation_id=conversation_id if conversation_id else "",
                     message="TTS: Synthesizing speech, called API, got api response -> Did audio conversion.",
                     time_stamp=datetime.datetime.utcnow(),
-                    text=message.text,
+                    text=text,
                 )
                 self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -166,7 +168,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 time_stamp=datetime.datetime.utcnow(),
-                text=message.text,
+                text=text,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -188,7 +190,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 conversation_id=conversation_id if conversation_id else "",
                 message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 time_stamp=datetime.datetime.utcnow(),
-                text=message.text,
+                text=text,
             )
             self.logger.debug(json.dumps(tts_log.to_dict()))
             return result

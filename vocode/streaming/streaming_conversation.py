@@ -135,13 +135,21 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.agent_filler_config.ask_more_time.filler_phrases
                 )
 
-                filler_ssml = (
-                    filler_phrase
-                    + f'<break time="{self.conversation.agent_filler_config.ask_more_time.trailing_silence}s"/>'
-                )
-                await self.publish_filler(
-                    SSMLMessage(text=filler_phrase, ssml=filler_ssml)
-                )
+                if (
+                    self.conversation.agent_filler_config.ask_more_time.trailing_silence
+                    > 0
+                ):
+                    filler_ssml = (
+                        filler_phrase
+                        + f'<break time="{self.conversation.agent_filler_config.ask_more_time.trailing_silence}s"/>'
+                    )
+                    await self.publish_filler(
+                        SSMLMessage(text=filler_phrase, ssml=filler_ssml)
+                    )
+                    return
+
+                await self.publish_filler(BaseMessage(text=filler_phrase))
+                return
 
         async def publish_ask_speak_up_filler(self):
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
@@ -167,6 +175,20 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     filler_phrase = random.choice(
                         self.conversation.agent_filler_config.speak_up.filler_phrases
                     )
+
+                    if (
+                        self.conversation.agent_filler_config.speak_up.trailing_silence
+                        > 0
+                    ):
+                        filler_ssml = (
+                            filler_phrase
+                            + f'<break time="{self.conversation.agent_filler_config.speak_up.trailing_silence}s"/>'
+                        )
+                        await self.publish_filler(
+                            SSMLMessage(text=filler_phrase, ssml=filler_ssml)
+                        )
+                        return
+
                     await self.publish_filler(BaseMessage(text=filler_phrase))
                     return
 

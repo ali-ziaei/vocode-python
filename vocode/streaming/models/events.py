@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Optional
 from vocode.streaming.models.model import TypedModel
+from vocode.streaming.models.message import BaseMessage
 
 
 class Sender(str, Enum):
@@ -43,7 +44,7 @@ class ActionEvent(Event, type=EventType.ACTION):
 
 
 class FillerEvent(Event, type=EventType.PUBLISH_FILLER):
-    filler_phrase: str
+    filler_message: BaseMessage
 
 
 class SpokenMetaData:

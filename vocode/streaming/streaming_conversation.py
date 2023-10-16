@@ -112,7 +112,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
 
             if not (
-                self.conversation.agent_asks_for_more_time_filler_phrases
+                self.conversation.agent_filler_config.ask_more_time
                 and self.conversation.agent_asks_for_more_time_threshold_sec
             ):
                 return
@@ -609,28 +609,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         # initiate filler pause tracking
         self.spoken_metadata = SpokenMetaData()
 
-        self.agent_asks_for_more_time_threshold_sec = (
-            self.agent.get_agent_config().agent_asks_for_more_time_threshold_sec
-        )
-        self.agent_asks_for_speak_up_threshold_sec = (
-            self.agent.get_agent_config().agent_asks_for_speak_up_threshold_sec
-        )
-        self.agent_asks_for_more_time_filler_phrases = (
-            self.agent.get_agent_config().agent_asks_for_more_time_filler_phrases
-        )
-        self.agent_asks_for_speak_up_filler_phrases = (
-            self.agent.get_agent_config().agent_asks_for_speak_up_filler_phrases
-        )
-        self.agent_asks_for_more_time_trailing_sil_sec = (
-            self.agent.get_agent_config().agent_asks_for_more_time_trailing_sil_sec
-        )
-
-        self.agent_asks_for_more_time_retry_before_terminate = (
-            self.agent.get_agent_config().agent_asks_for_more_time_retry_before_terminate
-        )
-        self.agent_terminate_call_phrase = (
-            self.agent.get_agent_config().agent_terminate_call_phrase
-        )
+        self.agent_filler_config = self.agent.get_agent_config().agent_filler_config
         self.agent_asks_for_more_time_retry_in_row_so_far = 0
 
         self.synthesizer = synthesizer

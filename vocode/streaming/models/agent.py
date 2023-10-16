@@ -9,6 +9,7 @@ from vocode.streaming.models.message import BaseMessage
 from .model import TypedModel, BaseModel
 from .vector_db import VectorDBConfig
 from dataclasses import dataclass
+from mashumaro import DataClassDictMixin
 
 FILLER_AUDIO_DEFAULT_SILENCE_THRESHOLD_SECONDS = 0.5
 LLM_AGENT_DEFAULT_TEMPERATURE = 1.0
@@ -64,7 +65,7 @@ class AzureOpenAIConfig(BaseModel):
 
 
 @dataclass
-class AgentSpeakUpFillerConfig:
+class AgentSpeakUpFillerConfig(DataClassDictMixin):
     threshold_sec: Optional[float] = None
     filler_phrases: Optional[List[str]] = None
     retry_before_terminate_the_call: Optional[int] = None
@@ -72,7 +73,7 @@ class AgentSpeakUpFillerConfig:
 
 
 @dataclass
-class AgentAskMoreTimeFillerConfig:
+class AgentAskMoreTimeFillerConfig(DataClassDictMixin):
     threshold_sec: Optional[float] = None
     filler_phrases: Optional[List[str]] = None
     retry_before_terminate_the_call: Optional[int] = None
@@ -80,9 +81,9 @@ class AgentAskMoreTimeFillerConfig:
 
 
 @dataclass
-class AgentFillerConfig:
-    speak_up_filler_config: Optional[AgentSpeakUpFillerConfig] = None
-    ask_more_time_filler_config: Optional[AgentAskMoreTimeFillerConfig] = None
+class AgentFillerConfig(DataClassDictMixin):
+    ask_more_time: Optional[AgentAskMoreTimeFillerConfig] = None
+    speak_up: Optional[AgentSpeakUpFillerConfig] = None
 
 
 class AgentConfig(TypedModel, type=AgentType.BASE.value):

@@ -320,6 +320,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
                 )
                 self.output_queue.put_nowait(event)
+                self.conversation.num_retry_speak_up_in_row = 0
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
         """
@@ -482,6 +483,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     is_interruptible=item.is_interruptible,
                     agent_response_tracker=item.agent_response_tracker,
                 )
+                self.conversation.num_retry_ask_more_time_in_row = 0
             except asyncio.CancelledError:
                 pass
 

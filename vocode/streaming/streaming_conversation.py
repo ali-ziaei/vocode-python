@@ -34,7 +34,7 @@ from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.models.events import Sender, FillerEvent, SpokenMetaData
 from vocode.streaming.models.log_message import BaseLog
-from vocode.streaming.models.message import BaseMessage
+from vocode.streaming.models.message import BaseMessage, SSMLMessage
 from vocode.streaming.models.synthesizer import SentimentConfig
 from vocode.streaming.models.transcriber import EndpointingConfig, TranscriberConfig
 from vocode.streaming.models.transcript import (
@@ -148,7 +148,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     filler_phrase
                     + f'<break time="{self.conversation.agent_asks_for_more_time_trailing_sil_sec}s"/>'
                 )
-                await self.publish_filler(filler_phrase, filler_ssml)
+                await self.publish_filler(
+                    SSMLMessage(text=filler_phrase, ssml=filler_ssml)
+                )
 
         async def publish_ask_speak_up_filler(self):
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
@@ -177,7 +179,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     filler_phrase = random.choice(
                         self.conversation.agent_asks_for_speak_up_filler_phrases
                     )
-                    await self.publish_filler(filler_phrase)
+                    await self.publish_filler(BaseMessage(text=filler_phrase))
                     return
 
             if (
@@ -190,30 +192,25 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 filler_phrase = random.choice(
                     self.conversation.agent_asks_for_speak_up_filler_phrases
                 )
-                await self.publish_filler(filler_phrase)
+                await self.publish_filler(BaseMessage(text=filler_phrase))
                 return
 
-        async def publish_filler(self, filler_text, filler_ssml: Optional[str] = None):
+        async def publish_filler(self, filler_message: BaseMessage):
             self.conversation.events_manager.publish_event(
                 FillerEvent(
                     conversation_id=self.conversation.id,
-                    filler_phrase=filler_text,
+                    filler_message=filler_message,
                 )
             )
             self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
-                AgentResponseMessage(
-                    message=BaseMessage(
-                        text=filler_ssml if filler_ssml else filler_text,
-                        hard_coded=True,
-                    ),
-                ),
+                AgentResponseMessage(message=filler_message),
                 is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
             )
             filler_log = BaseLog(
                 conversation_id=self.conversation.id,
                 message="FILLER: Published filler.",
                 time_stamp=datetime.datetime.utcnow(),
-                text=filler_text,
+                text=filler_message.text,
             )
             self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
             self.conversation.spoken_metadata.ready_to_publish_filler = False

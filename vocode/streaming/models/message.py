@@ -10,7 +10,6 @@ class MessageType(str, Enum):
 
 class BaseMessage(TypedModel, type=MessageType.BASE):
     text: str
-    hard_coded: bool = False
 
 
 class SSMLMessage(BaseMessage, type=MessageType.SSML):

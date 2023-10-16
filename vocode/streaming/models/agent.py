@@ -8,6 +8,7 @@ from vocode.streaming.models.actions import ActionConfig
 from vocode.streaming.models.message import BaseMessage
 from .model import TypedModel, BaseModel
 from .vector_db import VectorDBConfig
+from dataclasses import dataclass
 
 FILLER_AUDIO_DEFAULT_SILENCE_THRESHOLD_SECONDS = 0.5
 LLM_AGENT_DEFAULT_TEMPERATURE = 1.0
@@ -62,6 +63,28 @@ class AzureOpenAIConfig(BaseModel):
     engine: str = AZURE_OPENAI_DEFAULT_ENGINE
 
 
+@dataclass
+class AgentSpeakUpFillerConfig:
+    threshold_sec: Optional[float] = None
+    filler_phrases: Optional[List[str]] = None
+    retry_before_terminate_the_call: Optional[int] = None
+    terminate_call_phrase: Optional[str] = None
+
+
+@dataclass
+class AgentAskMoreTimeFillerConfig:
+    threshold_sec: Optional[float] = None
+    filler_phrases: Optional[List[str]] = None
+    retry_before_terminate_the_call: Optional[int] = None
+    terminate_call_phrase: Optional[str] = None
+
+
+@dataclass
+class AgentFillerConfig:
+    speak_up_filler_config: Optional[AgentSpeakUpFillerConfig] = None
+    ask_more_time_filler_config: Optional[AgentAskMoreTimeFillerConfig] = None
+
+
 class AgentConfig(TypedModel, type=AgentType.BASE.value):
     initial_message: Optional[BaseMessage] = None
     generate_responses: bool = True
@@ -72,13 +95,7 @@ class AgentConfig(TypedModel, type=AgentType.BASE.value):
     webhook_config: Optional[WebhookConfig] = None
     track_bot_sentiment: bool = False
     actions: Optional[List[ActionConfig]] = None
-    agent_asks_for_more_time_threshold_sec: Optional[float] = None
-    agent_asks_for_speak_up_threshold_sec: Optional[float] = None
-    agent_asks_for_more_time_filler_phrases: Optional[List[str]] = None
-    agent_asks_for_speak_up_filler_phrases: Optional[List[str]] = None
-    agent_asks_for_more_time_trailing_sil_sec: Optional[float] = None
-    agent_asks_for_more_time_retry_before_terminate: Optional[int] = None
-    agent_terminate_call_phrase: Optional[str] = None
+    agent_filler_config: Optional[AgentFillerConfig] = None
 
 
 class CutOffResponse(BaseModel):

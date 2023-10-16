@@ -65,17 +65,19 @@ class AzureOpenAIConfig(BaseModel):
 
 
 @dataclass
-class AgentSpeakUpFillerConfig(DataClassDictMixin):
+class AgentAskMoreTimeFillerConfig(DataClassDictMixin):
     threshold_sec: Optional[float] = None
     filler_phrases: Optional[List[str]] = None
+    trailing_silence: Optional[float] = None
     retry_before_terminate_the_call: Optional[int] = None
     terminate_call_phrase: Optional[str] = None
 
 
 @dataclass
-class AgentAskMoreTimeFillerConfig(DataClassDictMixin):
+class AgentSpeakUpFillerConfig(DataClassDictMixin):
     threshold_sec: Optional[float] = None
     filler_phrases: Optional[List[str]] = None
+    trailing_silence: Optional[float] = None
     retry_before_terminate_the_call: Optional[int] = None
     terminate_call_phrase: Optional[str] = None
 

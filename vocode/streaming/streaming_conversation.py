@@ -111,10 +111,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
                 return
 
-            if not (
-                self.conversation.agent_filler_config.ask_more_time
-                and self.conversation.agent_asks_for_more_time_threshold_sec
-            ):
+            if not self.conversation.agent_filler_config.ask_more_time:
                 return
 
             if self.conversation.agent_asks_for_more_time_trailing_sil_sec is None:

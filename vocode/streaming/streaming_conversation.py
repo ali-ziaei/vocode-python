@@ -114,12 +114,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if not self.conversation.agent_filler_config.ask_more_time:
                 return
 
-            if self.conversation.agent_asks_for_more_time_trailing_sil_sec is None:
-                self.conversation.agent_asks_for_more_time_trailing_sil_sec = 0.8
-                self.conversation.logger(
-                    "FILLER: agent_asks_for_more_time_trailing_sil_sec == 0.8"
-                )
-
             current_time = time.time()
             filler_phrase = None
 
@@ -135,15 +129,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 > self.conversation.spoken_metadata.agent_last_spoken_end_time
                 and current_time
                 - self.conversation.spoken_metadata.customer_last_spoken_end_time
-                > self.conversation.agent_asks_for_more_time_threshold_sec
+                > self.conversation.agent_filler_config.ask_more_time.threshold_sec
             ):
                 filler_phrase = random.choice(
-                    self.conversation.agent_asks_for_more_time_filler_phrases
+                    self.conversation.agent_filler_config.ask_more_time.filler_phrases
                 )
 
                 filler_ssml = (
                     filler_phrase
-                    + f'<break time="{self.conversation.agent_asks_for_more_time_trailing_sil_sec}s"/>'
+                    + f'<break time="{self.conversation.agent_filler_config.ask_more_time.trailing_silence}s"/>'
                 )
                 await self.publish_filler(
                     SSMLMessage(text=filler_phrase, ssml=filler_ssml)
@@ -153,10 +147,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if not self.conversation.spoken_metadata.ready_to_publish_filler:
                 return
 
-            if not (
-                self.conversation.agent_asks_for_speak_up_filler_phrases
-                and self.conversation.agent_asks_for_speak_up_threshold_sec
-            ):
+            if not self.conversation.agent_filler_config.speak_up:
                 return
 
             if self.conversation.spoken_metadata.agent_last_spoken_end_time is None:
@@ -171,10 +162,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 if (
                     current_time
                     - self.conversation.spoken_metadata.agent_last_spoken_end_time
-                    > self.conversation.agent_asks_for_speak_up_threshold_sec
+                    > self.conversation.agent_filler_config.speak_up.threshold_sec
                 ):
                     filler_phrase = random.choice(
-                        self.conversation.agent_asks_for_speak_up_filler_phrases
+                        self.conversation.agent_filler_config.speak_up.filler_phrases
                     )
                     await self.publish_filler(BaseMessage(text=filler_phrase))
                     return
@@ -182,12 +173,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if (
                 current_time
                 - self.conversation.spoken_metadata.agent_last_spoken_end_time
-                > self.conversation.agent_asks_for_speak_up_threshold_sec
+                > self.conversation.agent_filler_config.speak_up.threshold_sec
                 and self.conversation.spoken_metadata.agent_last_spoken_end_time
                 > self.conversation.spoken_metadata.customer_last_spoken_end_time
             ):
                 filler_phrase = random.choice(
-                    self.conversation.agent_asks_for_speak_up_filler_phrases
+                    self.conversation.agent_filler_config.speak_up.filler_phrases
                 )
                 await self.publish_filler(BaseMessage(text=filler_phrase))
                 return
@@ -531,36 +522,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         message_sent, conversation_id=self.conversation.id
                     )
 
-                if (
-                    self.conversation.agent_asks_for_more_time_retry_before_terminate
-                    and self.conversation.agent_terminate_call_phrase
-                ):
-                    # check how many times we played hard coded filler
-                    if message.hard_coded:
-                        self.conversation.agent_asks_for_more_time_retry_in_row_so_far += (
-                            1
-                        )
-                    else:
-                        self.conversation.agent_asks_for_more_time_retry_in_row_so_far = (
-                            0
-                        )
-
-                    if (
-                        self.conversation.agent_asks_for_more_time_retry_in_row_so_far
-                        >= self.conversation.agent_asks_for_more_time_retry_before_terminate
-                    ):
-                        self.conversation.transcriber.mute()
-                        if (
-                            self.conversation.agent_asks_for_more_time_retry_in_row_so_far
-                            == self.conversation.agent_asks_for_more_time_retry_before_terminate
-                        ):
-                            # play back terminate phrase
-                            await self.conversation.audio_service_worker.publish_filler(
-                                self.conversation.agent_terminate_call_phrase
-                            )
-                        else:
-                            await self.conversation.terminate()
-
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (
                         self.conversation.agent.create_goodbye_detection_task(
@@ -607,7 +568,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.spoken_metadata = SpokenMetaData()
 
         self.agent_filler_config = self.agent.get_agent_config().agent_filler_config
-        self.agent_asks_for_more_time_retry_in_row_so_far = 0
 
         self.synthesizer = synthesizer
         self.synthesis_enabled = True

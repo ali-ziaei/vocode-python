@@ -596,6 +596,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.agent.get_agent_config().agent_asks_for_more_time_trailing_sil_sec
         )
 
+        self.agent_asks_for_more_time_retry_before_terminate = (
+            self.agent.get_agent_config().agent_asks_for_more_time_retry_before_terminate
+        )
+        self.agent_terminate_call_phrase = (
+            self.agent.get_agent_config().agent_terminate_call_phrase
+        )
+
         self.synthesizer = synthesizer
         self.synthesis_enabled = True
 

@@ -77,6 +77,8 @@ class AgentConfig(TypedModel, type=AgentType.BASE.value):
     agent_asks_for_more_time_filler_phrases: Optional[List[str]] = None
     agent_asks_for_speak_up_filler_phrases: Optional[List[str]] = None
     agent_asks_for_more_time_trailing_sil_sec: Optional[float] = None
+    agent_asks_for_more_time_retry_before_terminate: Optional[int] = None
+    agent_terminate_call_phrase: Optional[str] = None
 
 
 class CutOffResponse(BaseModel):

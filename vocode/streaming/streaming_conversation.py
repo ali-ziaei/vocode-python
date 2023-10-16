@@ -565,7 +565,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 self.conversation.agent_terminate_call_phrase
                             )
                         else:
-                            await self.terminate()
+                            await self.conversation.terminate()
 
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (

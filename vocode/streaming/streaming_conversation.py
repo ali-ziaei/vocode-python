@@ -637,7 +637,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                 self.conversation.transcriptions_worker.endpoint_time = 0.0
                 if item.interruption_event.is_set():
-                    if last_content.text:
+                    if last_content and last_content.text:
                         await self.conversation.agent.update_last_bot_message_on_cut_off(
                             last_content.text + " " + message_sent,
                             conversation_id=self.conversation.id,

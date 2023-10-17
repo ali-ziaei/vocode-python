@@ -561,6 +561,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 self.conversation.num_retry_ask_more_time_in_row
                                 == self.conversation.agent_filler_config.ask_more_time.retry_before_terminate_the_call
                             ):
+                                self.conversation.audio_service.mute()
                                 self.conversation.transcriber.mute()
                                 await self.conversation.audio_service_worker.publish_filler(
                                     BaseMessage(
@@ -788,6 +789,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
     async def send_initial_message(self, initial_message: BaseMessage):
         # TODO: configure if initial message is interruptible
+        self.audio_service.mute()
         self.transcriber.mute()
         initial_message_tracker = asyncio.Event()
         agent_response_event = (
@@ -799,6 +801,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         )
         self.agent_responses_worker.consume_nonblocking(agent_response_event)
         await initial_message_tracker.wait()
+        self.audio_service.unmute()
         self.transcriber.unmute()
 
     async def check_for_idle(self):
@@ -894,6 +897,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         """
         if self.transcriber.get_transcriber_config().mute_during_speech:
             self.logger.debug("Muting transcriber")
+            self.audio_service.mute()
             self.transcriber.mute()
         message_sent = message
         cut_off = False

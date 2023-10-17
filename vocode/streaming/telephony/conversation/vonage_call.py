@@ -142,7 +142,7 @@ class VonageCall(Call[VonageOutputDevice]):
 
     def receive_audio(self, chunk: bytes):
         if not self.echo_mode:
-            super().receive_audio(chunk)
+            self.audio_service.send_audio(chunk)
             if self.output_to_speaker:
                 self.output_speaker.consume_nonblocking(chunk)
 

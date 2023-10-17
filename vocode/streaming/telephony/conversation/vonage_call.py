@@ -128,7 +128,7 @@ class VonageCall(Call[VonageOutputDevice]):
         while self.active:
             try:
                 chunk = await ws.receive_bytes()
-                self.receive_audio(chunk)
+                self.audio_service.send_audio(chunk)
                 if self.echo_mode:
                     self.output_device.consume_nonblocking(chunk)
             except WebSocketDisconnect:
@@ -142,7 +142,7 @@ class VonageCall(Call[VonageOutputDevice]):
 
     def receive_audio(self, chunk: bytes):
         if not self.echo_mode:
-            super().audio_service.send_audio(chunk)
+            super().receive_audio(chunk)
             if self.output_to_speaker:
                 self.output_speaker.consume_nonblocking(chunk)
 

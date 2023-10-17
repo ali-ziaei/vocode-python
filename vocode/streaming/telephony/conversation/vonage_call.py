@@ -83,7 +83,9 @@ class VonageCall(Call[VonageOutputDevice]):
         self.echo_mode = echo_mode
         if vonage_config:
             self.vonage_config = vonage_config.copy(deep=True)
-            self.vonage_config.recording_url = f"{vonage_config.recording_url}/{conversation_id}"
+            self.vonage_config.recording_url = (
+                f"{vonage_config.recording_url}/{conversation_id}"
+            )
         else:
             self.vonage_config = VonageConfig(
                 api_key=getenv("VONAGE_API_KEY"),
@@ -91,7 +93,9 @@ class VonageCall(Call[VonageOutputDevice]):
                 application_id=getenv("VONAGE_APPLICATION_ID"),
                 private_key=getenv("VONAGE_PRIVATE_KEY"),
             )
-        self.telephony_client = VonageClient(base_url=base_url, vonage_config=self.vonage_config)
+        self.telephony_client = VonageClient(
+            base_url=base_url, vonage_config=self.vonage_config
+        )
         self.vonage_uuid = vonage_uuid
         if output_to_speaker:
             self.output_speaker = SpeakerOutput.from_default_device(
@@ -138,7 +142,7 @@ class VonageCall(Call[VonageOutputDevice]):
 
     def receive_audio(self, chunk: bytes):
         if not self.echo_mode:
-            super().receive_audio(chunk)
+            super().audio_service.send_audio(chunk)
             if self.output_to_speaker:
                 self.output_speaker.consume_nonblocking(chunk)
 

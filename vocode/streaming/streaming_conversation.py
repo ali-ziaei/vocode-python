@@ -230,10 +230,37 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
             self.conversation.spoken_metadata.ready_to_publish_filler = False
 
+        async def publish_asr_result(self):
+            current_time = time.time()
+            if (
+                self.conversation.transcriptions_worker.transcription.message
+                and current_time
+                - self.conversation.transcriptions_worker.final_transcription_generated_time
+                >= self.conversation.transcriptions_worker.endpoint_time
+            ):
+                # we use getattr here to avoid the dependency cycle between VonageCall and StreamingConversation
+                event = self.conversation.transcriptions_worker.interruptible_event_factory.create_interruptible_event(
+                    TranscriptionAgentInput(
+                        transcription=self.conversation.transcriptions_worker.transcription,
+                        conversation_id=self.conversation.id,
+                        vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
+                        twilio_sid=getattr(self.conversation, "twilio_sid", None),
+                    )
+                )
+                self.conversation.transcriptions_worker.output_queue.put_nowait(event)
+                self.conversation.transcriptions_worker.transcription = Transcription(
+                    message="",
+                    confidence=1.0,
+                    is_final=True,
+                    is_interrupt=False,
+                    latency=0.0,
+                )
+
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
             await self.publish_ask_more_time_filler()
             await self.publish_ask_speak_up_filler()
+            await self.publish_asr_result()
 
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed
@@ -252,6 +279,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
             self.start_speaking = False
+            self.transcription: Transcription = Transcription(
+                message="",
+                confidence=1.0,
+                is_final=True,
+                is_interrupt=False,
+                latency=0.0,
+            )
+            self.final_transcription_generated_time = time.time()
+            self.endpoint_time = 0.0
 
         async def process(self, transcription: Transcription):
             self.conversation.mark_last_action_timestamp()
@@ -310,16 +346,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
             self.conversation.is_human_speaking = not transcription.is_final
             if transcription.is_final:
-                # we use getattr here to avoid the dependency cycle between VonageCall and StreamingConversation
-                event = self.interruptible_event_factory.create_interruptible_event(
-                    TranscriptionAgentInput(
-                        transcription=transcription,
-                        conversation_id=self.conversation.id,
-                        vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
-                        twilio_sid=getattr(self.conversation, "twilio_sid", None),
-                    )
+                message = " ".join([self.transcription.message, transcription.message])
+                self.transcription = Transcription(
+                    message=message,
+                    confidence=transcription.confidence,
+                    is_final=transcription.is_final,
+                    is_interrupt=transcription.is_interrupt,
+                    latency=transcription.latency,
                 )
-                self.output_queue.put_nowait(event)
+                self.final_transcription_generated_time = time.time()
                 self.conversation.num_retry_speak_up_in_row = 0
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
@@ -479,7 +514,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                 )
                 self.produce_interruptible_agent_response_event_nonblocking(
-                    (agent_response_message.message, synthesis_result),
+                    (
+                        agent_response_message.message,
+                        agent_response_message.last_content,
+                        synthesis_result,
+                    ),
                     is_interruptible=item.is_interruptible,
                     agent_response_tracker=item.agent_response_tracker,
                 )
@@ -506,7 +545,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, synthesis_result = item.payload
+                message, last_content, synthesis_result = item.payload
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
                     text="",
@@ -596,10 +635,20 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             else:
                                 await self.conversation.terminate()
 
-                if cut_off:
-                    await self.conversation.agent.update_last_bot_message_on_cut_off(
-                        message_sent, conversation_id=self.conversation.id
-                    )
+                self.conversation.transcriptions_worker.endpoint_time = 0.0
+                if item.interruption_event.is_set():
+                    if last_content.text:
+                        await self.conversation.agent.update_last_bot_message_on_cut_off(
+                            last_content.text + " " + message_sent,
+                            conversation_id=self.conversation.id,
+                        )
+                    else:
+                        self.conversation.logger.debug(
+                            f"CHANGE ENDPOINT TO {self.conversation.transcriber.get_transcriber_config().segmentation_sil_timeout_when_interrupt_happens}"
+                        )
+                        self.conversation.transcriptions_worker.endpoint_time = (
+                            self.conversation.transcriber.get_transcriber_config().segmentation_sil_timeout_when_interrupt_happens
+                        )
 
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (

@@ -248,6 +248,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
                 )
                 self.conversation.transcriptions_worker.output_queue.put_nowait(event)
+                self.conversation.num_retry_speak_up_in_row = 0
                 self.conversation.transcriptions_worker.transcription = Transcription(
                     message="",
                     confidence=1.0,
@@ -355,7 +356,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     latency=transcription.latency,
                 )
                 self.final_transcription_generated_time = time.time()
-                self.conversation.num_retry_speak_up_in_row = 0
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
         """
@@ -637,7 +637,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                 self.conversation.transcriptions_worker.endpoint_time = 0.0
                 if item.interruption_event.is_set():
-                    if last_content and last_content.text:
+                    if (
+                        last_content
+                        and len(last_content.text.split())
+                        >= self.conversation.transcriber.transcriber_config.min_num_words_for_real_endpoint
+                    ):
                         await self.conversation.agent.update_last_bot_message_on_cut_off(
                             last_content.text + " " + message_sent,
                             conversation_id=self.conversation.id,

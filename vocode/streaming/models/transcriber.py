@@ -134,6 +134,7 @@ class AzureTranscriberConfig(TranscriberConfig, type=TranscriberType.AZURE.value
     end_sil_timeout: Optional[int] = None  # (between 0 and inf) milliseconds
     enable_dictation: Optional[bool] = None
     segmentation_sil_timeout_when_interrupt_happens: Optional[float] = None
+    min_num_words_for_real_endpoint: Optional[int] = None
 
 
 class AssemblyAITranscriberConfig(

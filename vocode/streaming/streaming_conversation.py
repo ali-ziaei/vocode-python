@@ -234,10 +234,17 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.audio_service.unmute()
             self.conversation.transcriber.unmute()
 
+        async def publish_asr_result(self, item):
+            item = (
+                self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
+            )
+            self.conversation.agent_responses_worker.input_queue.put(item)
+
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
             await self.publish_ask_more_time_filler()
             await self.publish_ask_speak_up_filler()
+            await self.publish_asr_result()
 
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed
@@ -701,6 +708,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
             InterruptibleAgentResponseEvent[InterruptibleEvent[AgentInput]]
         ] = asyncio.Queue()
 
+        self.transcriptions_postprocessing_worker_output_queue: asyncio.Queue[
+            InterruptibleAgentResponseEvent[InterruptibleEvent[AgentInput]]
+        ] = asyncio.Queue()
+
         self.state_manager = self.create_state_manager()
 
         self.audio_service_worker = self.AudioServiceWorker(
@@ -718,8 +729,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         self.transcriptions_postprocessing_worker = (
             self.TranscriptionsPostprocessingWorker(
-                input_queue=self.transcriptions_worker.output_queue,
-                output_queue=self.agent.get_input_queue(),
+                input_queue=self.transcriptions_postprocessing_worker_input_queue,
+                output_queue=self.transcriptions_postprocessing_worker_output_queue,
                 conversation=self,
                 interruptible_event_factory=self.interruptible_event_factory,
             )

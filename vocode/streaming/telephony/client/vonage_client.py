@@ -82,6 +82,7 @@ class VonageClient(BaseTelephonyClient):
             ),
             digits,
             event_urls=[events_url],
+            **self.get_telephony_config().extra_params,
         )
 
     @staticmethod

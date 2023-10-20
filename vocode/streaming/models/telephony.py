@@ -40,7 +40,7 @@ class VonageConfig(BaseModel):
     record: bool = False
     recording_url: Optional[str] = None
     events_url: Optional[str] = None
-
+    extra_params: Optional[Dict[str, Any]] = {}
 
 class CallEntity(BaseModel):
     phone_number: str

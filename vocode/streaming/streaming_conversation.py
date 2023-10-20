@@ -234,6 +234,25 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.audio_service.unmute()
             self.conversation.transcriber.unmute()
 
+        async def _flush_asr_queue(self):
+            transcription_sent_to_llm: Optional[Transcription] = None
+            while True:
+                try:
+                    item = (
+                        self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
+                    )
+                    if transcription_sent_to_llm is None:
+                        transcription_sent_to_llm = item.payload.transcription
+                    else:
+                        transcription_sent_to_llm.message = (
+                            transcription_sent_to_llm.message
+                            + " "
+                            + item.payload.transcription.message
+                        )
+                except queue.Empty:
+                    break
+            return transcription_sent_to_llm
+
         async def publish_asr_result(self):
             current_time = time.time()
             if (
@@ -243,27 +262,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     current_time
                     - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
                 ) >= 5:
-                    try:
-                        item = (
-                            self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
-                        )
-                        if (
-                            self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm
-                            is None
-                        ):
-                            self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm = (
-                                item.payload.transcription
-                            )
-                        else:
-                            self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message = (
-                                self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message
-                                + " "
-                                + item.payload.transcription.message
-                            )
-
+                    transcription_sent_to_llm = self._flush_asr_queue()
+                    if transcription_sent_to_llm:
                         event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                             TranscriptionAgentInput(
-                                transcription=self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm,
+                                transcription=transcription_sent_to_llm,
                                 conversation_id=self.conversation.id,
                                 vonage_uuid=getattr(
                                     self.conversation, "vonage_uuid", None
@@ -273,10 +276,14 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 ),
                             )
                         )
-
                         await self.conversation.agent.get_input_queue().put(event)
-                    except asyncio.queues.QueueEmpty:
-                        pass
+                        asr_log = BaseLog(
+                            conversation_id=self.conversation.id,
+                            message="ASR: Post processed transcription.",
+                            time_stamp=datetime.datetime.utcnow(),
+                            text=f'Transcription: "{transcription_sent_to_llm.message}", Latency: "{transcription_sent_to_llm.latency}" seconds.',
+                        )
+                        self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -388,7 +395,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
             self.last_time_asr_was_generated: Optional[time.time] = None
-            self.transcription_sent_to_llm: Optional[Transcription] = None
 
         async def process(self, item: InterruptibleAgentResponseEvent):
             asr_log = BaseLog(

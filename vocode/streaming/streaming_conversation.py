@@ -259,9 +259,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
             ):
                 if (
-                    current_time
-                    - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
-                ) >= 5:
+                    (
+                        current_time
+                        - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
+                    )
+                    >= self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
+                ):
                     transcription_sent_to_llm = await self._flush_asr_queue()
                     if transcription_sent_to_llm:
                         event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
@@ -284,6 +287,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             text=f'Transcription: "{transcription_sent_to_llm.message}", Latency: "{transcription_sent_to_llm.latency}" seconds.',
                         )
                         self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+                        self.endpoint_threshold = 0.0
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -356,9 +360,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 if self.conversation.current_transcription_is_interrupt:
                     self.conversation.logger.debug("sending interrupt")
-                    print("\n\n\n\n")
-                    print("WE ARE HERE")
-                    print("\n\n\n\n")
+                    self.endpoint_threshold = 5
 
                 base_log = BaseLog(
                     conversation_id=self.conversation.id,
@@ -401,6 +403,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
             self.last_time_asr_was_generated: Optional[time.time] = None
+            self.endpoint_threshold = 0.0
 
         async def process(self, item: InterruptibleAgentResponseEvent):
             asr_log = BaseLog(

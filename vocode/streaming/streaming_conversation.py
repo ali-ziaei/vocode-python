@@ -235,13 +235,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.transcriber.unmute()
 
         async def publish_asr_result(self):
-            try:
-                item = (
-                    self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
-                )
-                await self.conversation.agent.get_input_queue().put(item)
-            except asyncio.queues.QueueEmpty:
-                pass
+            current_time = time.time()
+            if (current_time - self.last_time_asr_was_generated) >= 5:
+                try:
+                    item = (
+                        self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
+                    )
+                    await self.conversation.agent.get_input_queue().put(item)
+                except asyncio.queues.QueueEmpty:
+                    pass
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -352,7 +354,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
-            self.start_speaking = False
+            self.last_time_asr_was_generated: Optional[time.time] = None
 
         async def process(self, item: InterruptibleAgentResponseEvent):
             asr_log = BaseLog(
@@ -363,6 +365,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
             self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             self.output_queue.put_nowait(item)
+            self.last_time_asr_was_generated = time.time()
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
         """

@@ -236,7 +236,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         async def publish_asr_result(self):
             current_time = time.time()
-            if (current_time - self.last_time_asr_was_generated) >= 5:
+            if (
+                current_time
+                - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
+            ) >= 5:
                 try:
                     item = (
                         self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()

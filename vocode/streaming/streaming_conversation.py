@@ -235,10 +235,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.transcriber.unmute()
 
         async def publish_asr_result(self):
-            item = (
-                self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
-            )
-            await self.conversation.agent.get_input_queue().put(item)
+            try:
+                item = (
+                    self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
+                )
+                await self.conversation.agent.get_input_queue().put(item)
+            except asyncio.queues.QueueEmpty:
+                pass
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)

@@ -701,6 +701,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 print("\n\n\n\n")
 
                 if item.interruption_event.is_set():
+                    print("WE ARE HERE!!!!!!!!!!!!!!!!!!!!!!!!!!")
                     self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
                         self.conversation.transcriber.transcriber_config.new_endpoint_sec
                     )

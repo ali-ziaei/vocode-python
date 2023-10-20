@@ -211,6 +211,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
 
         async def publish_filler(self, filler_message: BaseMessage):
+            self.conversation.audio_service.mute()
+            self.conversation.transcriber.mute()
             self.conversation.events_manager.publish_event(
                 FillerEvent(
                     conversation_id=self.conversation.id,
@@ -219,7 +221,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
             self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
                 AgentResponseMessage(message=filler_message),
-                is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
+                is_interruptible=False,
             )
             filler_log = BaseLog(
                 conversation_id=self.conversation.id,
@@ -229,6 +231,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
             self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
             self.conversation.spoken_metadata.ready_to_publish_filler = False
+            self.conversation.audio_service.unmute()
+            self.conversation.transcriber.unmute()
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -322,33 +326,33 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.output_queue.put_nowait(event)
                 self.conversation.num_retry_speak_up_in_row = 0
 
-    class TranscriptionsPostprocessingWorker(AsyncQueueWorker):
-        """Processes all transcriptions: sends an interrupt if needed
-        and sends final transcriptions to the output queue"""
+    # class TranscriptionsPostprocessingWorker(AsyncQueueWorker):
+    #     """Processes all transcriptions: sends an interrupt if needed
+    #     and sends final transcriptions to the output queue"""
 
-        def __init__(
-            self,
-            input_queue: asyncio.Queue[InterruptibleEvent[AgentInput]],
-            output_queue: asyncio.Queue[InterruptibleEvent[AgentInput]],
-            conversation: "StreamingConversation",
-            interruptible_event_factory: InterruptibleEventFactory,
-        ):
-            super().__init__(input_queue, output_queue)
-            self.input_queue = input_queue
-            self.output_queue = output_queue
-            self.conversation = conversation
-            self.interruptible_event_factory = interruptible_event_factory
-            self.start_speaking = False
+    #     def __init__(
+    #         self,
+    #         input_queue: asyncio.Queue[InterruptibleEvent[AgentInput]],
+    #         output_queue: asyncio.Queue[InterruptibleEvent[AgentInput]],
+    #         conversation: "StreamingConversation",
+    #         interruptible_event_factory: InterruptibleEventFactory,
+    #     ):
+    #         super().__init__(input_queue, output_queue)
+    #         self.input_queue = input_queue
+    #         self.output_queue = output_queue
+    #         self.conversation = conversation
+    #         self.interruptible_event_factory = interruptible_event_factory
+    #         self.start_speaking = False
 
-        async def process(self, item: InterruptibleAgentResponseEvent):
-            asr_log = BaseLog(
-                conversation_id=self.conversation.id,
-                message="ASR: Post processed Final transcription.",
-                time_stamp=datetime.datetime.utcnow(),
-                text=f'Transcription: "{item.payload.transcription.message}", Latency: "{item.payload.transcription.latency}" seconds.',
-            )
-            self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
-            self.output_queue.put_nowait(item)
+    #     async def process(self, item: InterruptibleAgentResponseEvent):
+    #         asr_log = BaseLog(
+    #             conversation_id=self.conversation.id,
+    #             message="ASR: Post processed Final transcription.",
+    #             time_stamp=datetime.datetime.utcnow(),
+    #             text=f'Transcription: "{item.payload.transcription.message}", Latency: "{item.payload.transcription.latency}" seconds.',
+    #         )
+    #         self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+    #         self.output_queue.put_nowait(item)
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
         """
@@ -693,9 +697,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
             InterruptibleAgentResponseEvent[FillerAudio]
         ] = asyncio.Queue()
 
-        self.transcriptions_postprocessing_worker_input_queue: asyncio.Queue[
-            InterruptibleAgentResponseEvent[InterruptibleEvent[AgentInput]]
-        ] = asyncio.Queue()
+        # self.transcriptions_postprocessing_worker_input_queue: asyncio.Queue[
+        #     InterruptibleAgentResponseEvent[InterruptibleEvent[AgentInput]]
+        # ] = asyncio.Queue()
 
         self.state_manager = self.create_state_manager()
 
@@ -707,19 +711,19 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         self.transcriptions_worker = self.TranscriptionsWorker(
             input_queue=self.transcriber.output_queue,
-            output_queue=self.transcriptions_postprocessing_worker_input_queue,
+            output_queue=self.agent.get_input_queue(),
             conversation=self,
             interruptible_event_factory=self.interruptible_event_factory,
         )
 
-        self.transcriptions_postprocessing_worker = (
-            self.TranscriptionsPostprocessingWorker(
-                input_queue=self.transcriptions_worker.output_queue,
-                output_queue=self.agent.get_input_queue(),
-                conversation=self,
-                interruptible_event_factory=self.interruptible_event_factory,
-            )
-        )
+        # self.transcriptions_postprocessing_worker = (
+        #     self.TranscriptionsPostprocessingWorker(
+        #         input_queue=self.transcriptions_worker.output_queue,
+        #         output_queue=self.agent.get_input_queue(),
+        #         conversation=self,
+        #         interruptible_event_factory=self.interruptible_event_factory,
+        #     )
+        # )
 
         self.agent.attach_conversation_state_manager(self.state_manager)
         self.agent_responses_worker = self.AgentResponsesWorker(

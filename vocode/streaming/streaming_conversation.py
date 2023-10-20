@@ -213,7 +213,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         async def publish_filler(self, filler_message: BaseMessage):
             if (
                 self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
-                is not None
+                > 0.0
             ):
                 return
 
@@ -265,11 +265,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             ):
                 return
 
-            if (
-                not self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
-            ):
-                return
-
             wait_time = (
                 time.time()
                 - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
@@ -298,7 +293,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
                     self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
                     self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
-                        None
+                        0.0
                     )
 
         async def process(self, item: bytes):
@@ -417,7 +412,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
             self.last_time_asr_was_generated: Optional[time.time] = None
-            self.endpoint_threshold: Optional[float] = None
+            self.endpoint_threshold: float = 0.0
 
         async def process(self, item: InterruptibleAgentResponseEvent):
             asr_log = BaseLog(

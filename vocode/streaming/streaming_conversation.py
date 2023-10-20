@@ -788,6 +788,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.transcriber.start()
         self.audio_service_worker.start()
         self.transcriptions_worker.start()
+        self.transcriptions_postprocessing_worker.start()
         self.agent_responses_worker.start()
         self.synthesis_results_worker.start()
         self.output_device.start()

@@ -244,13 +244,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
                 ) >= 5:
                     try:
+                        item = (
+                            self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
+                        )
                         if (
                             self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm
                             is None
                         ):
-                            item = (
-                                self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
-                            )
                             self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm = (
                                 item.payload.transcription
                             )
@@ -263,7 +263,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                         event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                             TranscriptionAgentInput(
-                                transcription=self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message,
+                                transcription=self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm,
                                 conversation_id=self.conversation.id,
                                 vonage_uuid=getattr(
                                     self.conversation, "vonage_uuid", None

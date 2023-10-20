@@ -252,7 +252,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             is None
                         ):
                             self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm = (
-                                item.payload.transcription.message
+                                item.payload.transcription
                             )
                         else:
                             self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message = (

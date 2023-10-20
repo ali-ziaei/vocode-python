@@ -249,7 +249,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             + " "
                             + item.payload.transcription.message
                         )
-                except queue.Empty:
+                except asyncio.queues.QueueEmpty:
                     break
             return transcription_sent_to_llm
 

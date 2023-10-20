@@ -265,13 +265,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.spoken_metadata.ready_to_publish_filler = True
 
-                # asr_log = BaseLog(
-                #     conversation_id=self.conversation.id,
-                #     message="ASR: Final transcription.",
-                #     time_stamp=datetime.datetime.utcnow(),
-                #     text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
-                # )
-                # self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+                asr_log = BaseLog(
+                    conversation_id=self.conversation.id,
+                    message="ASR: Final transcription.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
+                )
+                self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             else:
                 if not self.start_speaking:
                     self.conversation.spoken_metadata.customer_last_spoken_start_time = (

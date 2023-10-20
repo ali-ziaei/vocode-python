@@ -211,6 +211,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
 
         async def publish_filler(self, filler_message: BaseMessage):
+            if (
+                self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
+                is not None
+            ):
+                return
+
             self.conversation.audio_service.mute()
             self.conversation.transcriber.mute()
             self.conversation.events_manager.publish_event(
@@ -235,61 +241,65 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.transcriber.unmute()
 
         async def _flush_asr_queue(self):
-            transcription_sent_to_llm: Optional[Transcription] = None
+            transcription_should_be_sent_to_llm: Optional[Transcription] = None
             while True:
                 try:
                     item = (
                         self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
                     )
-                    if transcription_sent_to_llm is None:
-                        transcription_sent_to_llm = item.payload.transcription
+                    if transcription_should_be_sent_to_llm is None:
+                        transcription_should_be_sent_to_llm = item.payload.transcription
                     else:
-                        transcription_sent_to_llm.message = (
-                            transcription_sent_to_llm.message
+                        transcription_should_be_sent_to_llm.message = (
+                            transcription_should_be_sent_to_llm.message
                             + " "
                             + item.payload.transcription.message
                         )
                 except asyncio.queues.QueueEmpty:
                     break
-            return transcription_sent_to_llm
+            return transcription_should_be_sent_to_llm
 
         async def publish_asr_result(self):
-            current_time = time.time()
             if (
-                self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
+                not self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
             ):
-                if (
-                    (
-                        current_time
-                        - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
-                    )
-                    >= self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
-                ):
-                    transcription_sent_to_llm = await self._flush_asr_queue()
-                    if transcription_sent_to_llm:
-                        event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
-                            TranscriptionAgentInput(
-                                transcription=transcription_sent_to_llm,
-                                conversation_id=self.conversation.id,
-                                vonage_uuid=getattr(
-                                    self.conversation, "vonage_uuid", None
-                                ),
-                                twilio_sid=getattr(
-                                    self.conversation, "twilio_sid", None
-                                ),
-                            )
-                        )
-                        await self.conversation.agent.get_input_queue().put(event)
-                        asr_log = BaseLog(
+                return
+
+            if (
+                not self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
+            ):
+                return
+
+            wait_time = (
+                time.time()
+                - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
+            )
+
+            if (
+                wait_time
+                >= self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
+            ):
+                transcription_should_be_sent_to_llm = await self._flush_asr_queue()
+                if transcription_should_be_sent_to_llm:
+                    event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
+                        TranscriptionAgentInput(
+                            transcription=transcription_should_be_sent_to_llm,
                             conversation_id=self.conversation.id,
-                            message="ASR: Sent to LLM after dynamic endpointing",
-                            time_stamp=datetime.datetime.utcnow(),
-                            text=f'Transcription: "{transcription_sent_to_llm.message}", Latency: "{transcription_sent_to_llm.latency}" seconds.',
+                            vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
+                            twilio_sid=getattr(self.conversation, "twilio_sid", None),
                         )
-                        self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
-                        self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
-                            0.0
-                        )
+                    )
+                    await self.conversation.agent.get_input_queue().put(event)
+                    asr_log = BaseLog(
+                        conversation_id=self.conversation.id,
+                        message=f'ASR: transcription_should_be_sent_to_llm with dynamic endpoint "{self.conversation.transcriptions_postprocessing_worker.endpoint_threshold}"',
+                        time_stamp=datetime.datetime.utcnow(),
+                        text=f'Transcription: "{transcription_should_be_sent_to_llm.message}", Latency: "{transcription_should_be_sent_to_llm.latency}" seconds.',
+                    )
+                    self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
+                        None
+                    )
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -407,7 +417,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
             self.last_time_asr_was_generated: Optional[time.time] = None
-            self.endpoint_threshold = 0.0
+            self.endpoint_threshold: Optional[float] = None
 
         async def process(self, item: InterruptibleAgentResponseEvent):
             asr_log = BaseLog(

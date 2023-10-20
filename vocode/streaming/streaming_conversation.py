@@ -279,7 +279,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         await self.conversation.agent.get_input_queue().put(event)
                         asr_log = BaseLog(
                             conversation_id=self.conversation.id,
-                            message="ASR: Post processed transcription.",
+                            message="ASR: Sent to LLM ...............",
                             time_stamp=datetime.datetime.utcnow(),
                             text=f'Transcription: "{transcription_sent_to_llm.message}", Latency: "{transcription_sent_to_llm.latency}" seconds.',
                         )

@@ -279,7 +279,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         await self.conversation.agent.get_input_queue().put(event)
                         asr_log = BaseLog(
                             conversation_id=self.conversation.id,
-                            message="ASR: Sent to LLM ...............",
+                            message="ASR: Sent to LLM after dynamic endpointing",
                             time_stamp=datetime.datetime.utcnow(),
                             text=f'Transcription: "{transcription_sent_to_llm.message}", Latency: "{transcription_sent_to_llm.latency}" seconds.',
                         )
@@ -287,9 +287,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
-            await self.publish_ask_more_time_filler()
-            await self.publish_ask_speak_up_filler()
-            await self.publish_asr_result()
+            await asyncio.gather(
+                self.publish_ask_more_time_filler(),
+                self.publish_ask_speak_up_filler(),
+                self.publish_asr_result(),
+            )
 
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed

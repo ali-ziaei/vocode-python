@@ -260,14 +260,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
             return transcription_should_be_sent_to_llm
 
         async def publish_asr_result(self):
-            if (
-                not self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
-            ):
+            if not self.conversation.transcriptions_worker.is_speaking_at:
                 return
 
             wait_time = (
-                time.time()
-                - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
+                time.time() - self.conversation.transcriptions_worker.is_speaking_at
             )
 
             if (
@@ -321,6 +318,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
             self.start_speaking = False
+            self.is_speaking_at: Optional[time.time] = None
 
         async def process(self, transcription: Transcription):
             self.conversation.mark_last_action_timestamp()
@@ -357,6 +355,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+
+            self.is_speaking_at = time.time()
 
             if (
                 not self.conversation.is_human_speaking
@@ -408,7 +408,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
-            self.last_time_asr_was_generated: Optional[time.time] = None
             self.endpoint_threshold: float = 0.0
 
         async def process(self, item: InterruptibleAgentResponseEvent):
@@ -420,7 +419,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
             self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             self.output_queue.put_nowait(item)
-            self.last_time_asr_was_generated = time.time()
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
         """

@@ -367,9 +367,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 if self.conversation.current_transcription_is_interrupt:
                     self.conversation.logger.debug("sending interrupt")
-                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
-                        5
-                    )
 
                 base_log = BaseLog(
                     conversation_id=self.conversation.id,
@@ -700,6 +697,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
+                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
+                        5
+                    )
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
                     )

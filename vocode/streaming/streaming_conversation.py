@@ -9,6 +9,7 @@ import random
 import threading
 import time
 import typing
+import copy
 from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, cast
 
 from vocode.streaming.action.worker import ActionsWorker
@@ -694,17 +695,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             else:
                                 await self.conversation.terminate()
 
-                print("\n\n\n\n")
-                print(
-                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
-                )
-                print("\n\n\n\n")
-
                 if item.interruption_event.is_set():
-                    print("WE ARE HERE!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
+                    print("WE ARE HERE!!!!!!!!!!!")
+                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = copy.deepcopy(
                         self.conversation.transcriber.transcriber_config.new_endpoint_sec
                     )
+                    print("\n\n\n\n")
+                    print(
+                        self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
+                    )
+                    print("\n\n\n\n")
 
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id

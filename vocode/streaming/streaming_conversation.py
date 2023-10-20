@@ -234,7 +234,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation.audio_service.unmute()
             self.conversation.transcriber.unmute()
 
-        async def publish_asr_result(self, item):
+        async def publish_asr_result(self):
             item = (
                 self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
             )

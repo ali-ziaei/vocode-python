@@ -287,7 +287,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             text=f'Transcription: "{transcription_sent_to_llm.message}", Latency: "{transcription_sent_to_llm.latency}" seconds.',
                         )
                         self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
-                        self.endpoint_threshold = 0.0
+                        self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
+                            0.0
+                        )
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -360,7 +362,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 if self.conversation.current_transcription_is_interrupt:
                     self.conversation.logger.debug("sending interrupt")
-                    self.endpoint_threshold = 5
+                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
+                        5
+                    )
 
                 base_log = BaseLog(
                     conversation_id=self.conversation.id,

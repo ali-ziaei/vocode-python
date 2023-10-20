@@ -356,6 +356,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 if self.conversation.current_transcription_is_interrupt:
                     self.conversation.logger.debug("sending interrupt")
+                    print("\n\n\n\n")
+                    print("WE ARE HERE")
+                    print("\n\n\n\n")
+
                 base_log = BaseLog(
                     conversation_id=self.conversation.id,
                     message="Human started speaking",
@@ -684,9 +688,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
-                    print("\n\n\n\n")
-                    print("INTERRUPT HAPPENS")
-                    print("\n\n\n\n\n")
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
                     )

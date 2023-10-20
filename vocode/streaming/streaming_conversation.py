@@ -252,13 +252,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             is None
                         ):
                             self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm = (
-                                item.payload.transcription
+                                item.payload.transcription.message
                             )
                         else:
                             self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message = (
                                 self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message
                                 + " "
-                                + item.payload.transcription
+                                + item.payload.transcription.message
                             )
 
                         event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(

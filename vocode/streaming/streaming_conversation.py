@@ -238,7 +238,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item = (
                 self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
             )
-            self.conversation.agent_responses_worker.input_queue.put(item)
+            await self.conversation.agent.get_input_queue().put(item)
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)

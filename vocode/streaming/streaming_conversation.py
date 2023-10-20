@@ -265,13 +265,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.spoken_metadata.ready_to_publish_filler = True
 
-                asr_log = BaseLog(
-                    conversation_id=self.conversation.id,
-                    message="ASR: Final transcription.",
-                    time_stamp=datetime.datetime.utcnow(),
-                    text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
-                )
-                self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+                # asr_log = BaseLog(
+                #     conversation_id=self.conversation.id,
+                #     message="ASR: Final transcription.",
+                #     time_stamp=datetime.datetime.utcnow(),
+                #     text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
+                # )
+                # self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             else:
                 if not self.start_speaking:
                     self.conversation.spoken_metadata.customer_last_spoken_start_time = (
@@ -328,7 +328,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         def __init__(
             self,
-            input_queue: asyncio.Queue[Transcription],
+            input_queue: asyncio.Queue[InterruptibleEvent[AgentInput]],
             output_queue: asyncio.Queue[InterruptibleEvent[AgentInput]],
             conversation: "StreamingConversation",
             interruptible_event_factory: InterruptibleEventFactory,
@@ -341,6 +341,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.start_speaking = False
 
         async def process(self, item: InterruptibleAgentResponseEvent):
+            asr_log = BaseLog(
+                conversation_id=self.conversation.id,
+                message="ASR: Post processed Final transcription.",
+                time_stamp=datetime.datetime.utcnow(),
+                text=f'Transcription: "{item.payload.transcription.message}", Latency: "{item.payload.transcription.latency}" seconds.',
+            )
+            self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
             self.output_queue.put_nowait(item)
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
@@ -687,11 +694,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         ] = asyncio.Queue()
 
         self.transcriptions_postprocessing_worker_input_queue: asyncio.Queue[
-            InterruptibleAgentResponseEvent[Transcription]
-        ] = asyncio.Queue()
-
-        self.transcriptions_postprocessing_worker_output_queue: asyncio.Queue[
-            InterruptibleAgentResponseEvent[Transcription]
+            InterruptibleAgentResponseEvent[InterruptibleEvent[AgentInput]]
         ] = asyncio.Queue()
 
         self.state_manager = self.create_state_manager()
@@ -711,7 +714,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         self.transcriptions_postprocessing_worker = (
             self.TranscriptionsPostprocessingWorker(
-                input_queue=self.transcriptions_postprocessing_worker_output_queue,
+                input_queue=self.transcriptions_worker.output_queue,
                 output_queue=self.agent.get_input_queue(),
                 conversation=self,
                 interruptible_event_factory=self.interruptible_event_factory,
@@ -1042,7 +1045,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.transcriber.terminate()
         self.logger.debug("Terminating transcriptions worker")
         self.transcriptions_worker.terminate()
-        self.logger.debug("Terminating final transcriptions worker")
+        self.transcriptions_postprocessing_worker.terminate()
+        self.logger.debug("Terminating final transcriptions worker(s)")
         self.agent_responses_worker.terminate()
         self.logger.debug("Terminating synthesis results worker")
         self.synthesis_results_worker.terminate()

@@ -697,9 +697,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
-                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
-                        5
+                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold += (
+                        1
                     )
+
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
                     )

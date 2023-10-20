@@ -262,7 +262,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     current_time
                     - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
                 ) >= 5:
-                    transcription_sent_to_llm = self._flush_asr_queue()
+                    transcription_sent_to_llm = await self._flush_asr_queue()
                     if transcription_sent_to_llm:
                         event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                             TranscriptionAgentInput(

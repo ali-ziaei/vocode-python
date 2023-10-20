@@ -237,16 +237,46 @@ class StreamingConversation(Generic[OutputDeviceType]):
         async def publish_asr_result(self):
             current_time = time.time()
             if (
-                current_time
-                - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
-            ) >= 5:
-                try:
-                    item = (
-                        self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
-                    )
-                    await self.conversation.agent.get_input_queue().put(item)
-                except asyncio.queues.QueueEmpty:
-                    pass
+                self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
+            ):
+                if (
+                    current_time
+                    - self.conversation.transcriptions_postprocessing_worker.last_time_asr_was_generated
+                ) >= 5:
+                    try:
+                        if (
+                            self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm
+                            is None
+                        ):
+                            item = (
+                                self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
+                            )
+                            self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm = (
+                                item.payload.transcription
+                            )
+                        else:
+                            self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message = (
+                                self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message
+                                + " "
+                                + item.payload.transcription
+                            )
+
+                        event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
+                            TranscriptionAgentInput(
+                                transcription=self.conversation.transcriptions_postprocessing_worker.transcription_sent_to_llm.message,
+                                conversation_id=self.conversation.id,
+                                vonage_uuid=getattr(
+                                    self.conversation, "vonage_uuid", None
+                                ),
+                                twilio_sid=getattr(
+                                    self.conversation, "twilio_sid", None
+                                ),
+                            )
+                        )
+
+                        await self.conversation.agent.get_input_queue().put(event)
+                    except asyncio.queues.QueueEmpty:
+                        pass
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -358,6 +388,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
             self.last_time_asr_was_generated: Optional[time.time] = None
+            self.transcription_sent_to_llm: Optional[Transcription] = None
 
         async def process(self, item: InterruptibleAgentResponseEvent):
             asr_log = BaseLog(

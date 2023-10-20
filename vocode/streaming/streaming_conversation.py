@@ -683,7 +683,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             else:
                                 await self.conversation.terminate()
 
-                if cut_off:
+                if item.interruption_event.is_set():
+                    print("\n\n\n\n")
+                    print("INTERRUPT HAPPENS")
+                    print("\n\n\n\n\n")
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
                     )

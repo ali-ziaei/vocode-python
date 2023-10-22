@@ -248,6 +248,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     item = (
                         self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
                     )
+                    if item.payload.is_interrupt:
+                        continue
+
                     if transcription_should_be_sent_to_llm is None:
                         transcription_should_be_sent_to_llm = item.payload.transcription
                     else:
@@ -280,7 +283,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             conversation_id=self.conversation.id,
                             vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
                             twilio_sid=getattr(self.conversation, "twilio_sid", None),
-                        )
+                        ),
+                        is_interruptible=False,
                     )
                     await self.conversation.agent.get_input_queue().put(event)
                     asr_log = BaseLog(
@@ -388,7 +392,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         conversation_id=self.conversation.id,
                         vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
                         twilio_sid=getattr(self.conversation, "twilio_sid", None),
-                    )
+                    ),
+                    is_interruptible=False,
                 )
                 self.output_queue.put_nowait(event)
                 self.conversation.num_retry_speak_up_in_row = 0

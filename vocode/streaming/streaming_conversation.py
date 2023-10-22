@@ -623,7 +623,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             try:
                 message, last_content, synthesis_result = item.payload
                 if last_content is None:
-                    last_content = ""
+                    last_content = BaseMessage(text="")
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
                     text="",

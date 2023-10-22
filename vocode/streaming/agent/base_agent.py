@@ -433,7 +433,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         human_input,
         conversation_id: str,
         is_interrupt: bool = False,
-    ) -> Tuple[Optional[str], Optional[str], bool]:
+    ) -> Tuple[Optional[str], bool]:
         raise NotImplementedError
 
     async def generate_response(
@@ -442,6 +442,6 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         conversation_id: str,
         is_interrupt: bool = False,
     ) -> AsyncGenerator[
-        Tuple[Union[str, FunctionCall], Union[str, FunctionCall], bool], None
+        Tuple[Union[str, FunctionCall], bool], None
     ]:  # tuple of the content and whether it is interruptible
         raise NotImplementedError

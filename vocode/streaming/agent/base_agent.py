@@ -95,7 +95,6 @@ class AgentResponse(TypedModel, type=AgentResponseType.BASE.value):
 
 class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     message: BaseMessage
-    last_content: Optional[BaseMessage] = None
     is_interruptible: bool = True
 
 
@@ -220,7 +219,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         )
         is_first_response = True
         function_call = None
-        async for response, last_content, is_interruptible in responses:
+        async for response, is_interruptible in responses:
             if isinstance(response, FunctionCall):
                 function_call = response
                 continue
@@ -230,7 +229,6 @@ class RespondAgent(BaseAgent[AgentConfigType]):
             self.produce_interruptible_agent_response_event_nonblocking(
                 AgentResponseMessage(
                     message=BaseMessage(text=response),
-                    last_content=BaseMessage(text=last_content),
                 ),
                 is_interruptible=self.agent_config.allow_agent_to_be_cut_off
                 and is_interruptible,
@@ -248,7 +246,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         try:
             tracer_name_start = await self.get_tracer_name_start()
             with tracer.start_as_current_span(f"{tracer_name_start}.respond_total"):
-                response, last_content, should_stop = await self.respond(
+                response, should_stop = await self.respond(
                     transcription.message,
                     is_interrupt=transcription.is_interrupt,
                     conversation_id=conversation_id,
@@ -261,7 +259,6 @@ class RespondAgent(BaseAgent[AgentConfigType]):
             self.produce_interruptible_agent_response_event_nonblocking(
                 AgentResponseMessage(
                     message=BaseMessage(text=response),
-                    last_content=BaseMessage(text=last_content),
                 ),
                 is_interruptible=self.agent_config.allow_agent_to_be_cut_off,
             )

@@ -592,7 +592,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.produce_interruptible_agent_response_event_nonblocking(
                     (
                         agent_response_message.message,
-                        agent_response_message.last_content,
                         synthesis_result,
                     ),
                     is_interruptible=item.is_interruptible,
@@ -621,9 +620,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, last_content, synthesis_result = item.payload
-                if last_content is None:
-                    last_content = BaseMessage(text="")
+                message, synthesis_result = item.payload
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
                     text="",
@@ -660,7 +657,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                     message="TTS: Message played back.",
                     time_stamp=datetime.datetime.utcnow(),
-                    text=last_content.text + " " + message_sent,
+                    text=message_sent,
                 )
                 self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -720,11 +717,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                     self.conversation.audio_service.mute()
                     self.conversation.transcriber.mute()
-                    message_sent = (
-                        last_content.text
-                        + " "
-                        + " Sorry for interrupt, can you say that again?"
-                    )
+                    message_sent += "Sorry for interrupt, can you say that again?"
 
                     agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
                         AgentResponseMessage(message=BaseMessage(text=message_sent)),

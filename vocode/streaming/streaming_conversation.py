@@ -218,18 +218,21 @@ class StreamingConversation(Generic[OutputDeviceType]):
             ):
                 return
 
-            self.conversation.audio_service.mute()
-            self.conversation.transcriber.mute()
             self.conversation.events_manager.publish_event(
                 FillerEvent(
                     conversation_id=self.conversation.id,
                     filler_message=filler_message,
                 )
             )
-            self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
+
+            agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
                 AgentResponseMessage(message=filler_message),
                 is_interruptible=False,
             )
+            self.conversation.agent_responses_worker.consume_nonblocking(
+                agent_response_event
+            )
+
             filler_log = BaseLog(
                 conversation_id=self.conversation.id,
                 message="FILLER: Published filler.",
@@ -238,8 +241,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
             self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
             self.conversation.spoken_metadata.ready_to_publish_filler = False
-            self.conversation.audio_service.unmute()
-            self.conversation.transcriber.unmute()
 
         async def _flush_asr_queue(self):
             transcription_should_be_sent_to_llm: Optional[Transcription] = None
@@ -330,6 +331,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if transcription.message.strip() == "":
                 self.conversation.logger.info("Ignoring empty transcription")
                 return
+
             if transcription.is_final:
                 self.start_speaking = False
                 self.conversation.spoken_metadata.customer_last_spoken_end_time = (
@@ -706,20 +708,17 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
                     message_sent = "Sorry for interrupt, go on ..."
 
-                    self.conversation.audio_service.mute()
-                    self.conversation.transcriber.mute()
-
-                    self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
+                    agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
                         AgentResponseMessage(message=BaseMessage(text=message_sent)),
                         is_interruptible=False,
+                    )
+                    self.conversation.agent_responses_worker.consume_nonblocking(
+                        agent_response_event
                     )
 
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
                     )
-
-                    self.conversation.audio_service.unmute()
-                    self.conversation.transcriber.unmute()
 
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (

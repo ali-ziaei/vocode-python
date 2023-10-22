@@ -699,6 +699,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = copy.deepcopy(
                         self.conversation.transcriber.transcriber_config.new_endpoint_sec
                     )
+                    message_sent = "Sorry, go head"
+
+                    self.conversation.audio_service_worker.publish_filler(
+                        filler_message=BaseMessage(text="Sorry, go head")
+                    )
 
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id

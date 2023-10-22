@@ -998,8 +998,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     if interruptible_event.interrupt():
                         self.logger.debug("Interrupting event")
                         num_interrupts += 1
-                        self.audio_service.mute()
-                        self.transcriber.mute()
             except queue.Empty:
                 break
         self.agent.cancel_current_task()

@@ -701,13 +701,25 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
                     message_sent = "Sorry, go head"
 
-                    self.conversation.audio_service_worker.publish_filler(
-                        filler_message=BaseMessage(text="Sorry, go head")
+                    self.conversation.audio_service.mute()
+                    self.conversation.transcriber.mute()
+                    self.conversation.events_manager.publish_event(
+                        FillerEvent(
+                            conversation_id=self.conversation.id,
+                            filler_message=message_sent,
+                        )
+                    )
+                    self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
+                        AgentResponseMessage(message=message_sent),
+                        is_interruptible=False,
                     )
 
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
                     )
+
+                    self.conversation.audio_service.unmute()
+                    self.conversation.transcriber.unmute()
 
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (

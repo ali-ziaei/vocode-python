@@ -699,7 +699,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = copy.deepcopy(
                         self.conversation.transcriber.transcriber_config.new_endpoint_sec
                     )
-                    message_sent = "Sorry, go head"
+                    message_sent = "Sorry for interrupt, say that again"
 
                     self.conversation.audio_service.mute()
                     self.conversation.transcriber.mute()

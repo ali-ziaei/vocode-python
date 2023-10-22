@@ -705,7 +705,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.transcriber.mute()
 
                     self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
-                        AgentResponseMessage(message=message_sent),
+                        AgentResponseMessage(message=BaseMessage(text=message_sent)),
                         is_interruptible=False,
                     )
 

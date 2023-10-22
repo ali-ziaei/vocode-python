@@ -605,6 +605,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
+                print("==========\n\n")
+                print(item.payload)
                 message, synthesis_result = item.payload
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
@@ -696,6 +698,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
+                    print(" INTERRUPT HAPPENED .......")
+                    print("===============\n\n")
                     self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = copy.deepcopy(
                         self.conversation.transcriber.transcriber_config.new_endpoint_sec
                     )

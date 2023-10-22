@@ -660,7 +660,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                     message="TTS: Message played back.",
                     time_stamp=datetime.datetime.utcnow(),
-                    text=last_content + " " + message_sent,
+                    text=last_content.text + " " + message_sent,
                 )
                 self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -721,7 +721,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.audio_service.mute()
                     self.conversation.transcriber.mute()
                     message_sent = (
-                        last_content
+                        last_content.text
                         + " "
                         + " Sorry for interrupt, can you say that again?"
                     )

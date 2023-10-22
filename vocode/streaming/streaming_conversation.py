@@ -714,7 +714,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                     self.conversation.audio_service.mute()
                     self.conversation.transcriber.mute()
-                    message_sent = "Sorry for interrupt, can you say that again!"
+                    message_sent += " Sorry for interrupt, can you say that again?"
 
                     agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
                         AgentResponseMessage(message=BaseMessage(text=message_sent)),

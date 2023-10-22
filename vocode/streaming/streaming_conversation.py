@@ -590,7 +590,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                 )
                 self.produce_interruptible_agent_response_event_nonblocking(
-                    (agent_response_message.message, synthesis_result),
+                    (
+                        agent_response_message.message,
+                        agent_response_message.last_content,
+                        synthesis_result,
+                    ),
                     is_interruptible=item.is_interruptible,
                     agent_response_tracker=item.agent_response_tracker,
                 )
@@ -617,7 +621,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, synthesis_result = item.payload
+                message, last_content, synthesis_result = item.payload
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
                     text="",
@@ -654,7 +658,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                     message="TTS: Message played back.",
                     time_stamp=datetime.datetime.utcnow(),
-                    text=message_sent,
+                    text=last_content + " " + message_sent,
                 )
                 self.conversation.logger.debug(json.dumps(tts_log.to_dict()))
 
@@ -714,7 +718,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                     self.conversation.audio_service.mute()
                     self.conversation.transcriber.mute()
-                    message_sent += " Sorry for interrupt, can you say that again?"
+                    message_sent = (
+                        last_content
+                        + " "
+                        + " Sorry for interrupt, can you say that again?"
+                    )
 
                     agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
                         AgentResponseMessage(message=BaseMessage(text=message_sent)),

@@ -577,6 +577,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.produce_interruptible_agent_response_event_nonblocking(
                     (
                         agent_response_message.message,
+                        agent_response_message.last_message,
                         synthesis_result,
                     ),
                     is_interruptible=item.is_interruptible,
@@ -605,7 +606,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, synthesis_result = item.payload
+                message, last_message, synthesis_result = item.payload
+                if last_message is None:
+                    last_message = BaseMessage(text="")
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
                     text="",
@@ -696,27 +699,41 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
+                    message_sent_total = last_message.text + " " + message_sent
+                    message_sent_total = " ".join(message_sent_total.split()).strip()
                     if (
-                        self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec
+                        len(message_sent_total.split())
+                        <= self.conversation.agent_filler_config.agent_interrupt_customer.agent_num_spoken_words_as_interrupt_threshold
                     ):
-                        index = min(
-                            len(
-                                self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec
-                            )
-                            - 1,
-                            self.conversation.number_of_times_agent_interrupted_customer,
+                        self.conversation.number_of_times_agent_interrupted_customer += (
+                            1
                         )
-                        self.conversation.asr_post_process_endpoint_sec = self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec[
-                            index
-                        ]
+                        if (
+                            self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec
+                        ):
+                            index = min(
+                                len(
+                                    self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec
+                                )
+                                - 1,
+                                self.conversation.number_of_times_agent_interrupted_customer,
+                            )
+                            self.conversation.asr_post_process_endpoint_sec = self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec[
+                                index
+                            ]
+                            log = BaseLog(
+                                conversation_id=self.id,
+                                message=f'Agent: Endpointing failed for "{self.conversation.number_of_times_agent_interrupted_customer}" times, set asr endpoint value "{self.conversation.asr_post_process_endpoint_sec}" seconds',
+                                time_stamp=datetime.datetime.utcnow(),
+                                text=message_sent,
+                            )
+                            self.conversation.logger.debug(json.dumps(log.to_dict()))
 
                         if (
                             self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
                         ):
-                            message_sent = (
-                                message_sent
-                                + ". "
-                                + self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
+                            message_sent_total += (
+                                self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
                             )
 
                             agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
@@ -732,13 +749,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             )
 
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
-                        message_sent, conversation_id=self.conversation.id
+                        message_sent_total, conversation_id=self.conversation.id
                     )
 
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (
                         self.conversation.agent.create_goodbye_detection_task(
-                            message_sent
+                            message_sent_total
                         )
                     )
                     try:
@@ -1023,8 +1040,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 break
         self.agent.cancel_current_task()
         self.agent_responses_worker.cancel_current_task()
-        if num_interrupts > 0:
-            self.number_of_times_agent_interrupted_customer += 1
         return num_interrupts > 0
 
     def is_interrupt(self, transcription: Transcription):

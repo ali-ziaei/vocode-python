@@ -722,7 +722,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 index
                             ]
                             log = BaseLog(
-                                conversation_id=self.id,
+                                conversation_id=self.conversation.id,
                                 message=f'Agent: Endpointing failed for "{self.conversation.number_of_times_agent_interrupted_customer}" times, set asr endpoint value "{self.conversation.asr_post_process_endpoint_sec}" seconds',
                                 time_stamp=datetime.datetime.utcnow(),
                                 text=message_sent,

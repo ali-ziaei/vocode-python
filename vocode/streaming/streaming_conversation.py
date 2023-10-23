@@ -722,7 +722,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
 
                     agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
-                        AgentResponseMessage(message=BaseMessage(text=message_sent)),
+                        AgentResponseMessage(
+                            message=BaseMessage(
+                                text=self.conversation.agent_filler_config.interrupt_message
+                            )
+                        ),
                         is_interruptible=True,
                     )
                     self.conversation.agent_responses_worker.consume_nonblocking(

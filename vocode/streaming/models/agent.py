@@ -86,6 +86,7 @@ class AgentSpeakUpFillerConfig(DataClassDictMixin):
 class AgentFillerConfig(DataClassDictMixin):
     ask_more_time: Optional[AgentAskMoreTimeFillerConfig] = None
     speak_up: Optional[AgentSpeakUpFillerConfig] = None
+    interrupt_message: Optional[str] = None
 
 
 class AgentConfig(TypedModel, type=AgentType.BASE.value):

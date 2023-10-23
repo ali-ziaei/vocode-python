@@ -59,6 +59,7 @@ from vocode.streaming.utils.worker import (
     InterruptibleEventFactory,
     InterruptibleWorker,
 )
+from vocode.utils.sentry import sentry_probe, set_span_data
 
 OutputDeviceType = TypeVar("OutputDeviceType", bound=BaseOutputDevice)
 
@@ -375,8 +376,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.current_transcription_is_interrupt
             )
             self.conversation.is_human_speaking = not transcription.is_final
-            if transcription.is_final:
+
+            @sentry_probe("Receive ASR transcription")
+            def _push_transcription_to_queue():
                 # we use getattr here to avoid the dependency cycle between VonageCall and StreamingConversation
+                set_span_data(
+                    {
+                        "message": transcription.message,
+                        "duration": transcription.latency,
+                    }
+                )
                 event = self.interruptible_event_factory.create_interruptible_event(
                     TranscriptionAgentInput(
                         transcription=transcription,
@@ -388,6 +397,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.output_queue.put_nowait(event)
                 self.conversation.num_retry_speak_up_in_row = 0
+
+            if transcription.is_final:
+                _push_transcription_to_queue()
 
     class TranscriptionsPostprocessingWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed
@@ -1106,14 +1118,19 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
             self.logger.debug(log_message, context=context)
 
-            await asyncio.sleep(
-                max(
-                    speech_length_seconds
-                    - (end_time - start_time)
-                    - self.per_chunk_allowance_seconds,
-                    0,
+            @sentry_probe("TTS speaking", data={"message": message})
+            async def _tts_speaking():
+                await asyncio.sleep(
+                    max(
+                        speech_length_seconds
+                        - (end_time - start_time)
+                        - self.per_chunk_allowance_seconds,
+                        0,
+                    )
                 )
-            )
+
+            await _tts_speaking()
+
             self.mark_last_action_timestamp()
             chunk_idx += 1
             seconds_spoken += seconds_per_chunk

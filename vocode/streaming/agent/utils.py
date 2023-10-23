@@ -23,15 +23,18 @@ from vocode.streaming.models.transcript import (
     Message,
     Transcript,
 )
+from vocode.utils.sentry import sentry_probe_async_child_iter
 
 SENTENCE_ENDINGS = [".", "!", "?", "\n", ","]
 
 
+@sentry_probe_async_child_iter("collate_response_async")
 async def collate_response_async(
     gen: AsyncIterable[Union[str, FunctionFragment]],
-    sentence_endings: List[str] = SENTENCE_ENDINGS,
+    sentence_endings: Optional[List[str]] = None,
     get_functions: Literal[True, False] = False,
 ) -> AsyncGenerator[Union[str, FunctionCall], None]:
+    sentence_endings = sentence_endings or SENTENCE_ENDINGS
     sentence_endings_pattern = "|".join(map(re.escape, sentence_endings))
     list_item_ending_pattern = r"\n"
     buffer = ""

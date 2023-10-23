@@ -713,27 +713,28 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         self.conversation.transcriber.transcriber_config.new_endpoint_sec
                     )
 
-                    self.conversation.audio_service.mute()
-                    self.conversation.transcriber.mute()
-                    message_sent = (
-                        message_sent
-                        + ". "
-                        + self.conversation.agent_filler_config.interrupt_message
-                    )
+                    if self.conversation.agent_filler_config.interrupt_message:
+                        self.conversation.audio_service.mute()
+                        self.conversation.transcriber.mute()
+                        message_sent = (
+                            message_sent
+                            + ". "
+                            + self.conversation.agent_filler_config.interrupt_message
+                        )
 
-                    agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
-                        AgentResponseMessage(
-                            message=BaseMessage(
-                                text=self.conversation.agent_filler_config.interrupt_message
-                            )
-                        ),
-                        is_interruptible=True,
-                    )
-                    self.conversation.agent_responses_worker.consume_nonblocking(
-                        agent_response_event
-                    )
-                    self.conversation.audio_service.unmute()
-                    self.conversation.transcriber.unmute()
+                        agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
+                            AgentResponseMessage(
+                                message=BaseMessage(
+                                    text=self.conversation.agent_filler_config.interrupt_message
+                                )
+                            ),
+                            is_interruptible=True,
+                        )
+                        self.conversation.agent_responses_worker.consume_nonblocking(
+                            agent_response_event
+                        )
+                        self.conversation.audio_service.unmute()
+                        self.conversation.transcriber.unmute()
 
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
@@ -780,6 +781,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.audio_service = audio_service
         self.transcriber = transcriber
         self.agent = agent
+        self.number_of_times_agent_interrupted_customer = 0
 
         # initiate filler pause tracking
         self.spoken_metadata = SpokenMetaData()
@@ -1025,6 +1027,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 break
         self.agent.cancel_current_task()
         self.agent_responses_worker.cancel_current_task()
+        if num_interrupts > 0:
+            self.number_of_times_agent_interrupted_customer += 1
         return num_interrupts > 0
 
     def is_interrupt(self, transcription: Transcription):

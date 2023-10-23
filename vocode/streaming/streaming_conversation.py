@@ -717,8 +717,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                     self.conversation.audio_service.mute()
                     self.conversation.transcriber.mute()
-                    message_sent += (
-                        self.conversation.agent_filler_config.interrupt_message
+                    message_sent = (
+                        message_sent
+                        + ". "
+                        + self.conversation.agent_filler_config.interrupt_message
                     )
 
                     agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(

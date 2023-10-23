@@ -95,6 +95,7 @@ class AgentResponse(TypedModel, type=AgentResponseType.BASE.value):
 
 class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     message: BaseMessage
+    last_message: Optional[BaseMessage] = None
     is_interruptible: bool = True
 
 
@@ -219,7 +220,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         )
         is_first_response = True
         function_call = None
-        async for response, is_interruptible in responses:
+        async for response, last_content, is_interruptible in responses:
             if isinstance(response, FunctionCall):
                 function_call = response
                 continue
@@ -227,7 +228,10 @@ class RespondAgent(BaseAgent[AgentConfigType]):
                 agent_span_first.end()
                 is_first_response = False
             self.produce_interruptible_agent_response_event_nonblocking(
-                AgentResponseMessage(message=BaseMessage(text=response)),
+                AgentResponseMessage(
+                    message=BaseMessage(text=response),
+                    last_message=BaseMessage(text=last_content),
+                ),
                 is_interruptible=self.agent_config.allow_agent_to_be_cut_off
                 and is_interruptible,
                 agent_response_tracker=agent_input.agent_response_tracker,
@@ -244,7 +248,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         try:
             tracer_name_start = await self.get_tracer_name_start()
             with tracer.start_as_current_span(f"{tracer_name_start}.respond_total"):
-                response, should_stop = await self.respond(
+                response, last_content, should_stop = await self.respond(
                     transcription.message,
                     is_interrupt=transcription.is_interrupt,
                     conversation_id=conversation_id,
@@ -255,7 +259,10 @@ class RespondAgent(BaseAgent[AgentConfigType]):
             return True
         if response:
             self.produce_interruptible_agent_response_event_nonblocking(
-                AgentResponseMessage(message=BaseMessage(text=response)),
+                AgentResponseMessage(
+                    message=BaseMessage(text=response),
+                    last_message=BaseMessage(text=last_content),
+                ),
                 is_interruptible=self.agent_config.allow_agent_to_be_cut_off,
             )
             return should_stop
@@ -360,7 +367,10 @@ class RespondAgent(BaseAgent[AgentConfigType]):
             user_message = params["user_message"]
             user_message_tracker = asyncio.Event()
             self.produce_interruptible_agent_response_event_nonblocking(
-                AgentResponseMessage(message=BaseMessage(text=user_message)),
+                AgentResponseMessage(
+                    message=BaseMessage(text=user_message),
+                    last_message=BaseMessage(text=""),
+                ),
                 agent_response_tracker=user_message_tracker,
             )
         action_input: ActionInput
@@ -429,7 +439,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         human_input,
         conversation_id: str,
         is_interrupt: bool = False,
-    ) -> Tuple[Optional[str], bool]:
+    ) -> Tuple[Optional[str], Optional[str], bool]:
         raise NotImplementedError
 
     async def generate_response(
@@ -438,6 +448,6 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         conversation_id: str,
         is_interrupt: bool = False,
     ) -> AsyncGenerator[
-        Tuple[Union[str, FunctionCall], bool], None
+        Tuple[Union[str, FunctionCall], Union[str, FunctionCall], bool], None
     ]:  # tuple of the content and whether it is interruptible
         raise NotImplementedError

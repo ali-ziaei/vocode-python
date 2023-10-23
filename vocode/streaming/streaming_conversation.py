@@ -9,6 +9,7 @@ import random
 import threading
 import time
 import typing
+import copy
 from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, cast
 
 from vocode.streaming.action.worker import ActionsWorker
@@ -211,29 +212,95 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
 
         async def publish_filler(self, filler_message: BaseMessage):
-            self.conversation.events_manager.publish_event(
-                FillerEvent(
-                    conversation_id=self.conversation.id,
-                    filler_message=filler_message,
+            try:
+                self.conversation.events_manager.publish_event(
+                    FillerEvent(
+                        conversation_id=self.conversation.id,
+                        filler_message=filler_message,
+                    )
                 )
+
+                self.conversation.audio_service.mute()
+                self.conversation.transcriber.mute()
+
+                agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
+                    AgentResponseMessage(message=filler_message),
+                    is_interruptible=True,
+                )
+                self.conversation.agent_responses_worker.consume_nonblocking(
+                    agent_response_event
+                )
+
+                filler_log = BaseLog(
+                    conversation_id=self.conversation.id,
+                    message="FILLER: Published filler.",
+                    time_stamp=datetime.datetime.utcnow(),
+                    text=filler_message.text,
+                )
+                self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
+                self.conversation.spoken_metadata.ready_to_publish_filler = False
+            except Exception:
+                pass
+            finally:
+                self.conversation.audio_service.unmute()
+                self.conversation.transcriber.unmute()
+
+        async def _flush_asr_queue(self):
+            transcription_should_be_sent_to_llm: Optional[Transcription] = None
+            while True:
+                try:
+                    item = (
+                        self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
+                    )
+
+                    if transcription_should_be_sent_to_llm is None:
+                        transcription_should_be_sent_to_llm = item.payload.transcription
+                    else:
+                        transcription_should_be_sent_to_llm.message = (
+                            transcription_should_be_sent_to_llm.message
+                            + " "
+                            + item.payload.transcription.message
+                        )
+                except asyncio.queues.QueueEmpty:
+                    break
+            return transcription_should_be_sent_to_llm
+
+        async def publish_asr_result(self):
+            if not self.conversation.transcriptions_worker.is_speaking_at:
+                return
+
+            wait_time = (
+                time.time() - self.conversation.transcriptions_worker.is_speaking_at
             )
-            self.conversation.agent.produce_interruptible_agent_response_event_nonblocking(
-                AgentResponseMessage(message=filler_message),
-                is_interruptible=self.conversation.agent.agent_config.allow_agent_to_be_cut_off,
-            )
-            filler_log = BaseLog(
-                conversation_id=self.conversation.id,
-                message="FILLER: Published filler.",
-                time_stamp=datetime.datetime.utcnow(),
-                text=filler_message.text,
-            )
-            self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
-            self.conversation.spoken_metadata.ready_to_publish_filler = False
+
+            if wait_time >= self.conversation.asr_post_process_endpoint_sec:
+                transcription_should_be_sent_to_llm = await self._flush_asr_queue()
+                if transcription_should_be_sent_to_llm:
+                    event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
+                        TranscriptionAgentInput(
+                            transcription=transcription_should_be_sent_to_llm,
+                            conversation_id=self.conversation.id,
+                            vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
+                            twilio_sid=getattr(self.conversation, "twilio_sid", None),
+                        ),
+                        is_interruptible=False,
+                    )
+                    await self.conversation.agent.get_input_queue().put(event)
+                    asr_log = BaseLog(
+                        conversation_id=self.conversation.id,
+                        message=f'ASR: transcription_should_be_sent_to_llm with dynamic endpoint "{self.conversation.asr_post_process_endpoint_sec}"',
+                        time_stamp=datetime.datetime.utcnow(),
+                        text=f'Transcription: "{transcription_should_be_sent_to_llm.message}", Latency: "{transcription_should_be_sent_to_llm.latency}" seconds, and asr post processing endpointing: "{self.conversation.asr_post_process_endpoint_sec}" seconds.',
+                    )
+                    self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
-            await self.publish_ask_more_time_filler()
-            await self.publish_ask_speak_up_filler()
+            await asyncio.gather(
+                self.publish_ask_more_time_filler(),
+                self.publish_ask_speak_up_filler(),
+                self.publish_asr_result(),
+            )
 
     class TranscriptionsWorker(AsyncQueueWorker):
         """Processes all transcriptions: sends an interrupt if needed
@@ -252,12 +319,14 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
             self.start_speaking = False
+            self.is_speaking_at: Optional[time.time] = None
 
         async def process(self, transcription: Transcription):
             self.conversation.mark_last_action_timestamp()
             if transcription.message.strip() == "":
                 self.conversation.logger.info("Ignoring empty transcription")
                 return
+
             if transcription.is_final:
                 self.start_speaking = False
                 self.conversation.spoken_metadata.customer_last_spoken_end_time = (
@@ -289,6 +358,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
 
+            self.is_speaking_at = time.time()
+
             if (
                 not self.conversation.is_human_speaking
                 and self.conversation.is_interrupt(transcription)
@@ -298,6 +369,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 if self.conversation.current_transcription_is_interrupt:
                     self.conversation.logger.debug("sending interrupt")
+
                 base_log = BaseLog(
                     conversation_id=self.conversation.id,
                     message="Human started speaking",
@@ -317,10 +389,38 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         conversation_id=self.conversation.id,
                         vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
                         twilio_sid=getattr(self.conversation, "twilio_sid", None),
-                    )
+                    ),
+                    is_interruptible=False,
                 )
                 self.output_queue.put_nowait(event)
                 self.conversation.num_retry_speak_up_in_row = 0
+
+    class TranscriptionsPostprocessingWorker(AsyncQueueWorker):
+        """Processes all transcriptions: sends an interrupt if needed
+        and sends final transcriptions to the output queue"""
+
+        def __init__(
+            self,
+            input_queue: asyncio.Queue[InterruptibleEvent[AgentInput]],
+            output_queue: asyncio.Queue[InterruptibleEvent[AgentInput]],
+            conversation: "StreamingConversation",
+            interruptible_event_factory: InterruptibleEventFactory,
+        ):
+            super().__init__(input_queue, output_queue)
+            self.input_queue = input_queue
+            self.output_queue = output_queue
+            self.conversation = conversation
+            self.interruptible_event_factory = interruptible_event_factory
+
+        async def process(self, item: InterruptibleAgentResponseEvent):
+            asr_log = BaseLog(
+                conversation_id=self.conversation.id,
+                message="ASR: Post processed Final transcription.",
+                time_stamp=datetime.datetime.utcnow(),
+                text=f'Transcription: "{item.payload.transcription.message}", Latency: "{item.payload.transcription.latency}" seconds.',
+            )
+            self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+            self.output_queue.put_nowait(item)
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
         """
@@ -479,7 +579,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     conversation_id=self.conversation.id,
                 )
                 self.produce_interruptible_agent_response_event_nonblocking(
-                    (agent_response_message.message, synthesis_result),
+                    (
+                        agent_response_message.message,
+                        agent_response_message.last_message,
+                        synthesis_result,
+                    ),
                     is_interruptible=item.is_interruptible,
                     agent_response_tracker=item.agent_response_tracker,
                 )
@@ -506,7 +610,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, synthesis_result = item.payload
+                message, last_message, synthesis_result = item.payload
+                if last_message is None:
+                    last_message = BaseMessage(text="")
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
                     text="",
@@ -596,15 +702,64 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             else:
                                 await self.conversation.terminate()
 
-                if cut_off:
+                if item.interruption_event.is_set():
+                    message_sent_total = last_message.text + " " + message_sent
+                    message_sent_total = " ".join(message_sent_total.split()).strip()
+                    if (
+                        len(message_sent_total.split())
+                        <= self.conversation.agent_filler_config.agent_interrupt_customer.agent_num_spoken_words_as_interrupt_threshold
+                    ):
+                        self.conversation.number_of_times_agent_interrupted_customer += (
+                            1
+                        )
+                        if (
+                            self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec
+                        ):
+                            index = min(
+                                len(
+                                    self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec
+                                )
+                                - 1,
+                                self.conversation.number_of_times_agent_interrupted_customer,
+                            )
+                            self.conversation.asr_post_process_endpoint_sec = self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec[
+                                index
+                            ]
+                            log = BaseLog(
+                                conversation_id=self.conversation.id,
+                                message=f'Agent: Endpointing failed for "{self.conversation.number_of_times_agent_interrupted_customer}" times, set asr endpoint value "{self.conversation.asr_post_process_endpoint_sec}" seconds',
+                                time_stamp=datetime.datetime.utcnow(),
+                                text=message_sent,
+                            )
+                            self.conversation.logger.debug(json.dumps(log.to_dict()))
+
+                        if (
+                            self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
+                        ):
+                            message_sent_total += (
+                                self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
+                            )
+
+                            agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
+                                AgentResponseMessage(
+                                    message=BaseMessage(
+                                        text=self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
+                                    )
+                                ),
+                                is_interruptible=True,
+                            )
+                            self.conversation.agent_responses_worker.consume_nonblocking(
+                                agent_response_event
+                            )
+
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
-                        message_sent, conversation_id=self.conversation.id
+                        message_sent_total, conversation_id=self.conversation.id
                     )
 
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (
                         self.conversation.agent.create_goodbye_detection_task(
-                            message_sent
+                            message_sent_total
                         )
                     )
                     try:
@@ -642,6 +797,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.audio_service = audio_service
         self.transcriber = transcriber
         self.agent = agent
+        self.asr_post_process_endpoint_sec = 0.0
+        self.number_of_times_agent_interrupted_customer = -1
 
         # initiate filler pause tracking
         self.spoken_metadata = SpokenMetaData()
@@ -664,6 +821,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.filler_audio_queue: asyncio.Queue[
             InterruptibleAgentResponseEvent[FillerAudio]
         ] = asyncio.Queue()
+
+        self.transcriptions_postprocessing_worker_input_queue: asyncio.Queue[
+            InterruptibleAgentResponseEvent[InterruptibleEvent[AgentInput]]
+        ] = asyncio.Queue()
+
+        self.transcriptions_postprocessing_worker_output_queue: asyncio.Queue[
+            InterruptibleAgentResponseEvent[InterruptibleEvent[AgentInput]]
+        ] = asyncio.Queue()
+
         self.state_manager = self.create_state_manager()
 
         self.audio_service_worker = self.AudioServiceWorker(
@@ -674,10 +840,20 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         self.transcriptions_worker = self.TranscriptionsWorker(
             input_queue=self.transcriber.output_queue,
-            output_queue=self.agent.get_input_queue(),
+            output_queue=self.transcriptions_postprocessing_worker_input_queue,
             conversation=self,
             interruptible_event_factory=self.interruptible_event_factory,
         )
+
+        self.transcriptions_postprocessing_worker = (
+            self.TranscriptionsPostprocessingWorker(
+                input_queue=self.transcriptions_postprocessing_worker_input_queue,
+                output_queue=self.transcriptions_postprocessing_worker_output_queue,
+                conversation=self,
+                interruptible_event_factory=self.interruptible_event_factory,
+            )
+        )
+
         self.agent.attach_conversation_state_manager(self.state_manager)
         self.agent_responses_worker = self.AgentResponsesWorker(
             input_queue=self.agent.get_output_queue(),
@@ -748,6 +924,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.transcriber.start()
         self.audio_service_worker.start()
         self.transcriptions_worker.start()
+        self.transcriptions_postprocessing_worker.start()
         self.agent_responses_worker.start()
         self.synthesis_results_worker.start()
         self.output_device.start()
@@ -1001,7 +1178,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.transcriber.terminate()
         self.logger.debug("Terminating transcriptions worker")
         self.transcriptions_worker.terminate()
-        self.logger.debug("Terminating final transcriptions worker")
+        self.transcriptions_postprocessing_worker.terminate()
+        self.logger.debug("Terminating final transcriptions worker(s)")
         self.agent_responses_worker.terminate()
         self.logger.debug("Terminating synthesis results worker")
         self.synthesis_results_worker.terminate()

@@ -275,10 +275,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 time.time() - self.conversation.transcriptions_worker.is_speaking_at
             )
 
-            if (
-                wait_time
-                >= self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
-            ):
+            if wait_time >= self.conversation.asr_post_process_endpoint_sec:
                 transcription_should_be_sent_to_llm = await self._flush_asr_queue()
                 if transcription_should_be_sent_to_llm:
                     event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
@@ -295,12 +292,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         conversation_id=self.conversation.id,
                         message=f'ASR: transcription_should_be_sent_to_llm with dynamic endpoint "{self.conversation.transcriptions_postprocessing_worker.endpoint_threshold}"',
                         time_stamp=datetime.datetime.utcnow(),
-                        text=f'Transcription: "{transcription_should_be_sent_to_llm.message}", Latency: "{transcription_should_be_sent_to_llm.latency}" seconds.',
+                        text=f'Transcription: "{transcription_should_be_sent_to_llm.message}", Latency: "{transcription_should_be_sent_to_llm.latency}" seconds, and asr post processing endpointing: "{self.conversation.asr_post_process_endpoint_sec}" seconds.',
                     )
                     self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
-                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = (
-                        0.0
-                    )
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -419,7 +413,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
-            self.endpoint_threshold: float = 0.0
 
         async def process(self, item: InterruptibleAgentResponseEvent):
             asr_log = BaseLog(
@@ -709,32 +702,40 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
-                    self.conversation.transcriptions_postprocessing_worker.endpoint_threshold = copy.deepcopy(
-                        self.conversation.transcriber.transcriber_config.new_endpoint_sec
-                    )
+                    if (
+                        self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec
+                    ):
+                        index = min(
+                            len(
+                                self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec
+                            )
+                            - 1,
+                            self.conversation.number_of_times_agent_interrupted_customer,
+                        )
+                        self.asr_post_process_endpoint_sec = self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec[
+                            index
+                        ]
 
-                    if self.conversation.agent_filler_config.interrupt_message:
-                        self.conversation.audio_service.mute()
-                        self.conversation.transcriber.mute()
-                        message_sent = (
-                            message_sent
-                            + ". "
-                            + self.conversation.agent_filler_config.interrupt_message
-                        )
+                        if (
+                            self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
+                        ):
+                            message_sent = (
+                                message_sent
+                                + ". "
+                                + self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
+                            )
 
-                        agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
-                            AgentResponseMessage(
-                                message=BaseMessage(
-                                    text=self.conversation.agent_filler_config.interrupt_message
-                                )
-                            ),
-                            is_interruptible=True,
-                        )
-                        self.conversation.agent_responses_worker.consume_nonblocking(
-                            agent_response_event
-                        )
-                        self.conversation.audio_service.unmute()
-                        self.conversation.transcriber.unmute()
+                            agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
+                                AgentResponseMessage(
+                                    message=BaseMessage(
+                                        text=self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
+                                    )
+                                ),
+                                is_interruptible=True,
+                            )
+                            self.conversation.agent_responses_worker.consume_nonblocking(
+                                agent_response_event
+                            )
 
                     await self.conversation.agent.update_last_bot_message_on_cut_off(
                         message_sent, conversation_id=self.conversation.id
@@ -781,7 +782,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.audio_service = audio_service
         self.transcriber = transcriber
         self.agent = agent
-        self.number_of_times_agent_interrupted_customer = 0
+        self.asr_post_process_endpoint_sec = 0.0
+        self.number_of_times_agent_interrupted_customer = -1
 
         # initiate filler pause tracking
         self.spoken_metadata = SpokenMetaData()

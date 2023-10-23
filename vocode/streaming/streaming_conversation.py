@@ -284,7 +284,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     await self.conversation.agent.get_input_queue().put(event)
                     asr_log = BaseLog(
                         conversation_id=self.conversation.id,
-                        message=f'ASR: transcription_should_be_sent_to_llm with dynamic endpoint "{self.conversation.transcriptions_postprocessing_worker.endpoint_threshold}"',
+                        message=f'ASR: transcription_should_be_sent_to_llm with dynamic endpoint "{self.conversation.asr_post_process_endpoint_sec}"',
                         time_stamp=datetime.datetime.utcnow(),
                         text=f'Transcription: "{transcription_should_be_sent_to_llm.message}", Latency: "{transcription_should_be_sent_to_llm.latency}" seconds, and asr post processing endpointing: "{self.conversation.asr_post_process_endpoint_sec}" seconds.',
                     )

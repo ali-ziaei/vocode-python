@@ -212,12 +212,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 return
 
         async def publish_filler(self, filler_message: BaseMessage):
-            if (
-                self.conversation.transcriptions_postprocessing_worker.endpoint_threshold
-                > 0.0
-            ):
-                return
-
             self.conversation.events_manager.publish_event(
                 FillerEvent(
                     conversation_id=self.conversation.id,

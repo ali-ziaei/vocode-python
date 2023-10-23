@@ -706,7 +706,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             - 1,
                             self.conversation.number_of_times_agent_interrupted_customer,
                         )
-                        self.asr_post_process_endpoint_sec = self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec[
+                        self.conversation.asr_post_process_endpoint_sec = self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec[
                             index
                         ]
 

@@ -83,10 +83,17 @@ class AgentSpeakUpFillerConfig(DataClassDictMixin):
 
 
 @dataclass
+class AgentInterruptCustomer(DataClassDictMixin):
+    agent_message: Optional[str] = None
+    asr_endpoint_values_sec: Optional[List[float]] = None
+    agent_num_spoken_words_as_interrupt_threshold: Optional[int] = None
+
+
+@dataclass
 class AgentFillerConfig(DataClassDictMixin):
     ask_more_time: Optional[AgentAskMoreTimeFillerConfig] = None
     speak_up: Optional[AgentSpeakUpFillerConfig] = None
-    interrupt_message: Optional[str] = None
+    agent_interrupt_customer: Optional[AgentInterruptCustomer] = None
 
 
 class AgentConfig(TypedModel, type=AgentType.BASE.value):

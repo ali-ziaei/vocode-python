@@ -85,7 +85,7 @@ class AgentSpeakUpFillerConfig(DataClassDictMixin):
 @dataclass
 class AgentInterruptCustomer(DataClassDictMixin):
     agent_message: Optional[str] = None
-    asr_endpoint_values_sec: Optional[List[str]] = None
+    asr_endpoint_values_sec: Optional[List[float]] = None
 
 
 @dataclass

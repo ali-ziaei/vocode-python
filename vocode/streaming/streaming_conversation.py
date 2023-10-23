@@ -254,8 +254,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     item = (
                         self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
                     )
-                    if item.payload.transcription.is_interrupt:
-                        continue
 
                     if transcription_should_be_sent_to_llm is None:
                         transcription_should_be_sent_to_llm = item.payload.transcription

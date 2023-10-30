@@ -1,12 +1,12 @@
-import datetime
-from dataclasses import dataclass
-from mashumaro import DataClassDictMixin
+from dataclasses import dataclass, asdict
 from typing import Optional
+import json
 
 
 @dataclass
-class BaseLog(DataClassDictMixin):
-    conversation_id: str
+class BaseLogMessage:
     message: str
-    time_stamp: datetime.datetime
     text: Optional[str] = None
+
+    def __str__(self):
+        return json.dumps(asdict(self))

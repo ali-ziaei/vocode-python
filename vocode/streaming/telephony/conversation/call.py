@@ -1,13 +1,9 @@
 import logging
-import os
-from enum import Enum
 from typing import Optional, TypeVar, Union
-import time
 import json
 import datetime
-from vocode.streaming.models.log_message import BaseLog
+from vocode.streaming.models.logging import BaseLogMessage, LogContext
 from fastapi import WebSocket
-from pythonjsonlogger import jsonlogger  # type: ignore
 from vocode.streaming.agent.factory import AgentFactory
 from vocode.streaming.audio.factory import AudioServiceFactory
 from vocode.streaming.models.agent import AgentConfig
@@ -88,12 +84,12 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         self.logger.debug("Trying to attach WS to outbound call")
         self.output_device.ws = ws
         self.logger.debug("Attached WS to outbound call")
-        log = BaseLog(
-            conversation_id=self.id,
+
+        context = LogContext(conversation_id=self.id)
+        log_message = BaseLogMessage(
             message="Base: Attached WS to outbound call.",
-            time_stamp=datetime.datetime.utcnow(),
         )
-        self.logger.debug(json.dumps(log.to_dict()))
+        self.logger.debug(log_message, context=context)
 
     async def attach_ws_and_start(self, ws: WebSocket):
         raise NotImplementedError

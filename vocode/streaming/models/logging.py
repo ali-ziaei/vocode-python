@@ -10,3 +10,11 @@ class BaseLogMessage:
 
     def __str__(self):
         return json.dumps(asdict(self))
+
+
+@dataclass
+class LogContext:
+    conversation_id: str
+
+    def __str__(self):
+        return json.dumps(asdict(self))

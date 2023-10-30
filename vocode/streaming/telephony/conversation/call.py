@@ -55,20 +55,6 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         logger: Optional[logging.Logger] = None,
     ):
         conversation_id = conversation_id or create_conversation_id()
-
-        if logger and events_manager and events_manager.log_dir:
-            os.makedirs(events_manager.log_dir, exist_ok=True)
-            format_str: str = "%(asctime)s.%03d [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
-            log_file = os.path.join(
-                events_manager.log_dir, conversation_id + ".log.jsonl"
-            )
-            file_handler = logging.FileHandler(log_file)
-            file_handler.setLevel(logging.DEBUG)
-            formatter = jsonlogger.JsonFormatter(format_str)
-            formatter.converter = time.gmtime
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-
         self.logger = wrap_logger(
             logger or logging.getLogger(__name__),
             conversation_id=conversation_id,

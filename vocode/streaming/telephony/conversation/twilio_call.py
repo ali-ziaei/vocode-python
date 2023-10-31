@@ -28,7 +28,7 @@ from vocode.streaming.utils.events_manager import EventsManager
 from vocode.streaming.utils.state_manager import TwilioCallStateManager
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.audio.factory import AudioServiceFactory
-from vocode.streaming.models.log_message import BaseLog
+from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
 import datetime
 import json
 
@@ -82,13 +82,17 @@ class TwilioCall(Call[TwilioOutputDevice]):
         self.config_manager = config_manager
         if twilio_config:
             self.twilio_config = twilio_config.copy(deep=True)
-            self.twilio_config.recording_url = f"{twilio_config.recording_url}/{conversation_id}"
+            self.twilio_config.recording_url = (
+                f"{twilio_config.recording_url}/{conversation_id}"
+            )
         else:
             self.twilio_config = TwilioConfig(
                 account_sid=getenv("TWILIO_ACCOUNT_SID"),
                 auth_token=getenv("TWILIO_AUTH_TOKEN"),
             )
-        self.telephony_client = TwilioClient(base_url=base_url, twilio_config=self.twilio_config)
+        self.telephony_client = TwilioClient(
+            base_url=base_url, twilio_config=self.twilio_config
+        )
         self.twilio_sid = twilio_sid
         self.latest_media_timestamp = 0
         self.echo_mode = echo_mode
@@ -109,7 +113,10 @@ class TwilioCall(Call[TwilioOutputDevice]):
                 else None
             )
             recording = (
-                twilio_call_ref.recordings.create(recording_status_callback=self.twilio_config.recording_url, **recordings_create_params)
+                twilio_call_ref.recordings.create(
+                    recording_status_callback=self.twilio_config.recording_url,
+                    **recordings_create_params,
+                )
                 if recordings_create_params
                 else twilio_call_ref.recordings.create()
             )
@@ -163,12 +170,13 @@ class TwilioCall(Call[TwilioOutputDevice]):
                     int(media["timestamp"]) - (self.latest_media_timestamp + 20)
                 )
                 self.logger.debug(f"Filling {bytes_to_fill} bytes of silence")
-                audio_log = BaseLog(
-                    conversation_id=self.id,
+
+                context = VocodeLogContext(conversation_id=self.id)
+                log_message = VocodeBaseLogMessage(
                     message="Audio: Start sending audio to audio service.",
-                    time_stamp=datetime.datetime.utcnow(),
                 )
-                self.logger.debug(json.dumps(audio_log.to_dict()))
+                self.logger.debug(log_message, context=context)
+
                 # NOTE: 0xff is silence for mulaw audio
                 chunk = b"\xff" * bytes_to_fill
                 if self.echo_mode:

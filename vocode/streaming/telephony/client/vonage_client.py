@@ -82,11 +82,16 @@ class VonageClient(BaseTelephonyClient):
             ),
             digits,
             event_urls=[events_url],
-            **self.get_telephony_config().extra_params,
         )
 
     @staticmethod
-    def create_call_ncco(base_url, conversation_id, record, recording_url: Optional[str] = None, is_outbound: bool = False):
+    def create_call_ncco(
+        base_url,
+        conversation_id,
+        record,
+        recording_url: Optional[str] = None,
+        is_outbound: bool = False,
+    ):
         ncco: List[Dict[str, Any]] = []
         if record:
             if not recording_url:

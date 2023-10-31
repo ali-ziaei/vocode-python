@@ -227,13 +227,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     agent_response_event
                 )
 
-                filler_log = BaseLog(
-                    conversation_id=self.conversation.id,
+                context = VocodeLogContext(self.conversation.id)
+                log_message = VocodeBaseLogMessage(
                     message="FILLER: Published filler.",
-                    time_stamp=datetime.datetime.utcnow(),
                     text=filler_message.text,
                 )
-                self.conversation.logger.debug(json.dumps(filler_log.to_dict()))
+                self.conversation.logger.debug(log_message, context=context)
+
                 self.conversation.spoken_metadata.ready_to_publish_filler = False
             except Exception:
                 pass
@@ -282,13 +282,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         is_interruptible=False,
                     )
                     await self.conversation.agent.get_input_queue().put(event)
-                    asr_log = BaseLog(
-                        conversation_id=self.conversation.id,
+
+                    context = VocodeLogContext(self.conversation.id)
+                    log_message = VocodeBaseLogMessage(
                         message=f'ASR: transcription_should_be_sent_to_llm with dynamic endpoint "{self.conversation.asr_post_process_endpoint_sec}"',
-                        time_stamp=datetime.datetime.utcnow(),
                         text=f'Transcription: "{transcription_should_be_sent_to_llm.message}", Latency: "{transcription_should_be_sent_to_llm.latency}" seconds, and asr post processing endpointing: "{self.conversation.asr_post_process_endpoint_sec}" seconds.',
                     )
-                    self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+                    self.conversation.logger.debug(log_message, context=context)
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -407,13 +407,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.interruptible_event_factory = interruptible_event_factory
 
         async def process(self, item: InterruptibleAgentResponseEvent):
-            asr_log = BaseLog(
-                conversation_id=self.conversation.id,
+            context = VocodeLogContext(self.conversation.id)
+            log_message = VocodeBaseLogMessage(
                 message="ASR: Post processed Final transcription.",
-                time_stamp=datetime.datetime.utcnow(),
                 text=f'Transcription: "{item.payload.transcription.message}", Latency: "{item.payload.transcription.latency}" seconds.',
             )
-            self.conversation.logger.debug(json.dumps(asr_log.to_dict()))
+            self.conversation.logger.debug(log_message, context=context)
             self.output_queue.put_nowait(item)
 
     class FillerAudioWorker(InterruptibleAgentResponseWorker):
@@ -717,13 +716,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             self.conversation.asr_post_process_endpoint_sec = self.conversation.agent_filler_config.agent_interrupt_customer.asr_endpoint_values_sec[
                                 index
                             ]
-                            log = BaseLog(
-                                conversation_id=self.conversation.id,
+
+                            context = VocodeLogContext(self.conversation.id)
+                            log_message = VocodeBaseLogMessage(
                                 message=f'Agent: Endpointing failed for "{self.conversation.number_of_times_agent_interrupted_customer}" times, set asr endpoint value "{self.conversation.asr_post_process_endpoint_sec}" seconds',
-                                time_stamp=datetime.datetime.utcnow(),
                                 text=message_sent,
                             )
-                            self.conversation.logger.debug(json.dumps(log.to_dict()))
+                            self.conversation.logger.debug(log_message, context=context)
 
                         if (
                             self.conversation.agent_filler_config.agent_interrupt_customer.agent_message

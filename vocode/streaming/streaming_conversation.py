@@ -48,7 +48,6 @@ from vocode.streaming.synthesizer.base_synthesizer import (
 )
 from vocode.streaming.transcriber.base_transcriber import BaseTranscriber, Transcription
 from vocode.streaming.utils import create_conversation_id, get_chunk_size_per_second
-from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
 from vocode.streaming.utils.events_manager import EventsManager
 from vocode.streaming.utils.goodbye_model import GoodbyeModel
 from vocode.streaming.utils.state_manager import ConversationStateManager
@@ -565,9 +564,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=agent_response_message.message.text,
                 )
                 self.conversation.logger.debug(log_message, context=context)
-                import pdb
-
-                pdb.set_trace()
                 synthesis_result = await self.conversation.synthesizer.create_speech(
                     agent_response_message.message,
                     self.chunk_size,

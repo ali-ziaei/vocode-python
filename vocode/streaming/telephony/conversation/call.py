@@ -21,7 +21,6 @@ from vocode.streaming.telephony.config_manager.base_config_manager import (
 from vocode.streaming.telephony.constants import DEFAULT_SAMPLING_RATE
 from vocode.streaming.transcriber.factory import TranscriberFactory
 from vocode.streaming.utils import create_conversation_id
-from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
 from vocode.streaming.utils.events_manager import EventsManager
 
 TelephonyOutputDeviceType = TypeVar(
@@ -51,11 +50,7 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         logger: Optional[logging.Logger] = None,
     ):
         conversation_id = conversation_id or create_conversation_id()
-        self.logger = wrap_logger(
-            logger or logging.getLogger(__name__),
-            conversation_id=conversation_id,
-        )
-
+        self.logger = logger or logging.getLogger(__name__)
         self.from_phone = from_phone
         self.to_phone = to_phone
         self.base_url = base_url

@@ -26,15 +26,12 @@ from vocode.streaming.agent.base_agent import (
 from vocode.streaming.agent.bot_sentiment_analyser import BotSentimentAnalyser
 from vocode.streaming.agent.chat_gpt_agent import ChatGPTAgent
 from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioService
-from vocode.streaming.constants import (
-    ALLOWED_IDLE_TIME,
-    PER_CHUNK_ALLOWANCE_SECONDS,
-)
+from vocode.streaming.constants import ALLOWED_IDLE_TIME, PER_CHUNK_ALLOWANCE_SECONDS
 from vocode.streaming.models.actions import ActionInput
 from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
 from vocode.streaming.models.audio import AudioServiceConfig
-from vocode.streaming.models.events import Sender, FillerEvent, SpokenMetaData
-from vocode.streaming.models.logging import BaseLogMessage, LogContext
+from vocode.streaming.models.events import FillerEvent, Sender, SpokenMetaData
+from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
 from vocode.streaming.models.message import BaseMessage, SSMLMessage
 from vocode.streaming.models.synthesizer import SentimentConfig
 from vocode.streaming.models.transcriber import EndpointingConfig, TranscriberConfig
@@ -334,8 +331,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.spoken_metadata.ready_to_publish_filler = True
 
-                context = LogContext(self.conversation.id)
-                log_message = BaseLogMessage(
+                context = VocodeLogContext(self.conversation.id)
+                log_message = VocodeBaseLogMessage(
                     message="ASR: Final transcription.",
                     text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
                 )
@@ -350,8 +347,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.spoken_metadata.customer_last_spoken_end_time = None
                 self.conversation.spoken_metadata.ready_to_publish_filler = False
 
-                context = LogContext(self.conversation.id)
-                log_message = BaseLogMessage(
+                context = VocodeLogContext(self.conversation.id)
+                log_message = VocodeBaseLogMessage(
                     message="ASR: Partial transcription.",
                     text=f'Transcription: "{transcription.message}", Latency: "{transcription.latency}" seconds.',
                 )
@@ -369,8 +366,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 if self.conversation.current_transcription_is_interrupt:
                     self.conversation.logger.debug("sending interrupt")
 
-                base_log = BaseLog(
-                    conversation_id=self.conversation.id,
+                context = VocodeLogContext(self.conversation.id)
+                log_message = VocodeBaseLogMessage(
                     message="Human started speaking",
                 )
                 self.conversation.logger.debug(log_message, context=context)
@@ -562,13 +559,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     ):
                         await self.conversation.filler_audio_worker.wait_for_filler_audio_to_finish()
 
-                context = LogContext(self.conversation.id)
-                log_message = BaseLogMessage(
+                context = VocodeLogContext(self.conversation.id)
+                log_message = VocodeBaseLogMessage(
                     message="TTS: Synthesizing speech.",
                     text=agent_response_message.message.text,
                 )
                 self.conversation.logger.debug(log_message, context=context)
+                import pdb
 
+                pdb.set_trace()
                 synthesis_result = await self.conversation.synthesizer.create_speech(
                     agent_response_message.message,
                     self.chunk_size,
@@ -643,8 +642,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 item.agent_response_tracker.set()
 
-                context = LogContext(self.conversation.id)
-                log_message = BaseLogMessage(
+                context = VocodeLogContext(self.conversation.id)
+                log_message = VocodeBaseLogMessage(
                     message="TTS: Message played back.",
                     text=message_sent,
                 )
@@ -784,10 +783,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         logger: Optional[logging.Logger] = None,
     ):
         self.id = conversation_id or create_conversation_id()
-        self.logger = wrap_logger(
-            logger or logging.getLogger(__name__),
-            conversation_id=self.id,
-        )
+        self.logger = logger or logging.getLogger(__name__)
 
         self.echo_mode = echo_mode
         self.output_device = output_device
@@ -1093,8 +1089,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if stop_event.is_set():
                 message_sent = f"{synthesis_result.get_message_up_to(seconds_spoken)}-"
 
-                context = LogContext(self.id)
-                log_message = BaseLogMessage(
+                context = VocodeLogContext(self.id)
+                log_message = VocodeBaseLogMessage(
                     message="TTS: Interrupted, stopping text to speech.",
                     text=message_sent,
                 )
@@ -1108,8 +1104,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_device.consume_nonblocking(chunk_result.chunk)
             end_time = time.time()
 
-            context = LogContext(self.id)
-            log_message = BaseLogMessage(
+            context = VocodeLogContext(self.id)
+            log_message = VocodeBaseLogMessage(
                 message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{speech_length_seconds}" to output device.',
                 text=message_sent,
             )

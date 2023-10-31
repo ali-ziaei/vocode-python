@@ -21,7 +21,7 @@ from vocode.streaming.agent.bot_sentiment_analyser import BotSentiment
 from vocode.streaming.models.message import BaseMessage, SSMLMessage
 from vocode.streaming.utils.mp3_helper import decode_mp3
 from vocode.streaming.synthesizer.miniaudio_worker import MiniaudioWorker
-from vocode.streaming.models.logging import BaseLogMessage, LogContext
+from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
 
 ADAM_VOICE_ID = "pNInz6obpgDQGcFmaJgB"
 ELEVEN_LABS_BASE_URL = "https://api.elevenlabs.io/v1/"
@@ -74,15 +74,15 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         audio_data = self.cache.get(cache_key)
 
         if audio_data is not None:
-            context = LogContext(conversation_id if conversation_id else "")
-            log_message = BaseLogMessage(
+            context = VocodeLogContext(conversation_id if conversation_id else "")
+            log_message = VocodeBaseLogMessage(
                 message="TTS: Synthesizing speech -> found in Redis.",
                 text=text,
             )
             self.logger.debug(log_message, context=context)
         else:
-            context = LogContext(conversation_id if conversation_id else "")
-            log_message = BaseLogMessage(
+            context = VocodeLogContext(conversation_id if conversation_id else "")
+            log_message = VocodeBaseLogMessage(
                 message="TTS: Synthesizing speech -> calling API.",
                 text=text,
             )
@@ -120,8 +120,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                     f"ElevenLabs API returned {response.status} status code"
                 )
 
-            context = LogContext(conversation_id if conversation_id else "")
-            log_message = BaseLogMessage(
+            context = VocodeLogContext(conversation_id if conversation_id else "")
+            log_message = VocodeBaseLogMessage(
                 message="TTS: Synthesizing speech, called API -> Got api response.",
                 text=text,
             )
@@ -137,8 +137,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                     ),
                 )
 
-                context = LogContext(conversation_id if conversation_id else "")
-                log_message = BaseLogMessage(
+                context = VocodeLogContext(conversation_id if conversation_id else "")
+                log_message = VocodeBaseLogMessage(
                     message="TTS: Synthesizing speech, called API, got api response -> Did audio conversion.",
                     text=text,
                 )
@@ -158,8 +158,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 ),
             )
 
-            context = LogContext(conversation_id if conversation_id else "")
-            log_message = BaseLogMessage(
+            context = VocodeLogContext(conversation_id if conversation_id else "")
+            log_message = VocodeBaseLogMessage(
                 message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 text=text,
             )
@@ -180,8 +180,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             )
             convert_span.end()
 
-            context = LogContext(conversation_id if conversation_id else "")
-            log_message = BaseLogMessage(
+            context = VocodeLogContext(conversation_id if conversation_id else "")
+            log_message = VocodeBaseLogMessage(
                 message="TTS: Synthesizing speech, got from Redis -> Did audio conversion.",
                 text=text,
             )

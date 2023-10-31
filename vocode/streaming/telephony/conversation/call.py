@@ -2,7 +2,7 @@ import logging
 from typing import Optional, TypeVar, Union
 import json
 import datetime
-from vocode.streaming.models.logging import BaseLogMessage, LogContext
+from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
 from fastapi import WebSocket
 from vocode.streaming.agent.factory import AgentFactory
 from vocode.streaming.audio.factory import AudioServiceFactory
@@ -85,8 +85,8 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         self.output_device.ws = ws
         self.logger.debug("Attached WS to outbound call")
 
-        context = LogContext(conversation_id=self.id)
-        log_message = BaseLogMessage(
+        context = VocodeLogContext(conversation_id=self.id)
+        log_message = VocodeBaseLogMessage(
             message="Base: Attached WS to outbound call.",
         )
         self.logger.debug(log_message, context=context)

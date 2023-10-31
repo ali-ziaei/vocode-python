@@ -28,7 +28,7 @@ from vocode.streaming.utils.events_manager import EventsManager
 from vocode.streaming.utils.state_manager import TwilioCallStateManager
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.audio.factory import AudioServiceFactory
-from vocode.streaming.models.logging import BaseLogMessage, LogContext
+from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
 import datetime
 import json
 
@@ -171,8 +171,8 @@ class TwilioCall(Call[TwilioOutputDevice]):
                 )
                 self.logger.debug(f"Filling {bytes_to_fill} bytes of silence")
 
-                context = LogContext(conversation_id=self.id)
-                log_message = BaseLogMessage(
+                context = VocodeLogContext(conversation_id=self.id)
+                log_message = VocodeBaseLogMessage(
                     message="Audio: Start sending audio to audio service.",
                 )
                 self.logger.debug(log_message, context=context)

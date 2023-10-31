@@ -4,7 +4,7 @@ import json
 
 
 @dataclass
-class BaseLogMessage:
+class VocodeBaseLogMessage:
     message: str
     text: Optional[str] = None
 
@@ -13,7 +13,7 @@ class BaseLogMessage:
 
 
 @dataclass
-class LogContext:
+class VocodeLogContext:
     conversation_id: str
 
     def __str__(self):

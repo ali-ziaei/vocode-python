@@ -37,25 +37,5 @@ class AudioServiceFactory:
         # remove the conversation data from local memory
         self.ACTIVE_AUDIO_SERVICE.pop(conversation_id, None)
 
-    async def save_audio_data(self, conversation_id: str):
-        """save chats"""
-        if conversation_id not in self.ACTIVE_AUDIO_SERVICE:
-            return
-        audio_service = self.ACTIVE_AUDIO_SERVICE[conversation_id].audio_service
-        audio_service_config = self.ACTIVE_AUDIO_SERVICE[
-            conversation_id
-        ].audio_service_config
-        if audio_service_config.log_dir and audio_service.audio_bytes:
-            if audio_service_config.audio_encoding == AudioEncoding.MULAW:
-                data = audioop.ulaw2lin(audio_service.audio_bytes, 2)
-            else:
-                data = audio_service.audio_bytes
-            audio_data = np.frombuffer(data, dtype=np.int16)
-            audio_path = os.path.join(
-                audio_service_config.log_dir, conversation_id + ".flac"
-            )
-            soundfile.write(audio_path, audio_data, audio_service_config.sampling_rate)
-
     async def terminate_audio_service(self, conversation_id: str):
-        await self.save_audio_data(conversation_id)
         await self.clear_cache(conversation_id)

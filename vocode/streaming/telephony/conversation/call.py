@@ -1,13 +1,9 @@
 import logging
-import os
-from enum import Enum
 from typing import Optional, TypeVar, Union
-import time
 import json
 import datetime
-from vocode.streaming.models.log_message import BaseLog
+from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
 from fastapi import WebSocket
-from pythonjsonlogger import jsonlogger  # type: ignore
 from vocode.streaming.agent.factory import AgentFactory
 from vocode.streaming.audio.factory import AudioServiceFactory
 from vocode.streaming.models.agent import AgentConfig
@@ -25,7 +21,6 @@ from vocode.streaming.telephony.config_manager.base_config_manager import (
 from vocode.streaming.telephony.constants import DEFAULT_SAMPLING_RATE
 from vocode.streaming.transcriber.factory import TranscriberFactory
 from vocode.streaming.utils import create_conversation_id
-from vocode.streaming.utils.conversation_logger_adapter import wrap_logger
 from vocode.streaming.utils.events_manager import EventsManager
 
 TelephonyOutputDeviceType = TypeVar(
@@ -55,25 +50,7 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         logger: Optional[logging.Logger] = None,
     ):
         conversation_id = conversation_id or create_conversation_id()
-
-        if logger and events_manager and events_manager.log_dir:
-            os.makedirs(events_manager.log_dir, exist_ok=True)
-            format_str: str = "%(asctime)s.%03d [%(filename)s:%(lineno)s ] [%(levelname)s] ['%(message)s']"
-            log_file = os.path.join(
-                events_manager.log_dir, conversation_id + ".log.jsonl"
-            )
-            file_handler = logging.FileHandler(log_file)
-            file_handler.setLevel(logging.DEBUG)
-            formatter = jsonlogger.JsonFormatter(format_str)
-            formatter.converter = time.gmtime
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-
-        self.logger = wrap_logger(
-            logger or logging.getLogger(__name__),
-            conversation_id=conversation_id,
-        )
-
+        self.logger = logger or logging.getLogger(__name__)
         self.from_phone = from_phone
         self.to_phone = to_phone
         self.base_url = base_url
@@ -102,12 +79,12 @@ class Call(StreamingConversation[TelephonyOutputDeviceType]):
         self.logger.debug("Trying to attach WS to outbound call")
         self.output_device.ws = ws
         self.logger.debug("Attached WS to outbound call")
-        log = BaseLog(
-            conversation_id=self.id,
+
+        context = VocodeLogContext(conversation_id=self.id)
+        log_message = VocodeBaseLogMessage(
             message="Base: Attached WS to outbound call.",
-            time_stamp=datetime.datetime.utcnow(),
         )
-        self.logger.debug(json.dumps(log.to_dict()))
+        self.logger.debug(log_message, context=context)
 
     async def attach_ws_and_start(self, ws: WebSocket):
         raise NotImplementedError

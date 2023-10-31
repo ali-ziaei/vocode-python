@@ -8,15 +8,10 @@ from vocode.streaming.models.events import Event, EventType
 
 
 class EventsManager:
-    def __init__(
-        self, subscriptions: List[EventType] = [], log_dir: Optional[str] = None
-    ):
+    def __init__(self, subscriptions: List[EventType] = []):
         self.queue: asyncio.Queue[Event] = asyncio.Queue()
         self.subscriptions = set(subscriptions)
         self.active = False
-        self.log_dir = log_dir
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
 
     def publish_event(self, event: Event):
         if event.type in self.subscriptions:

@@ -98,7 +98,7 @@ class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     message: BaseMessage
     last_message: Optional[BaseMessage] = None
     is_interruptible: bool = True
-    hang_up: bool = False
+    hang_up: bool = True
 
 
 class AgentResponseStop(AgentResponse, type=AgentResponseType.STOP.value):

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from enum import Enum
 import json
 import logging
 import random
+import typing
+from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     AsyncGenerator,
     Generator,
     Generic,
@@ -13,11 +15,11 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
-    TYPE_CHECKING,
 )
-import typing
+
 from opentelemetry import trace
 from opentelemetry.trace import Span
+
 from vocode.streaming.action.factory import ActionFactory
 from vocode.streaming.action.phone_call_action import (
     TwilioPhoneCallAction,
@@ -30,7 +32,6 @@ from vocode.streaming.models.actions import (
     FunctionCall,
     FunctionFragment,
 )
-
 from vocode.streaming.models.agent import (
     AgentConfig,
     ChatGPTAgentConfig,
@@ -38,10 +39,10 @@ from vocode.streaming.models.agent import (
 )
 from vocode.streaming.models.message import BaseMessage
 from vocode.streaming.models.model import BaseModel, TypedModel
+from vocode.streaming.models.transcript import Transcript
 from vocode.streaming.transcriber.base_transcriber import Transcription
 from vocode.streaming.utils import remove_non_letters_digits
 from vocode.streaming.utils.goodbye_model import GoodbyeModel
-from vocode.streaming.models.transcript import Transcript
 from vocode.streaming.utils.worker import (
     InterruptibleAgentResponseEvent,
     InterruptibleEvent,
@@ -97,6 +98,7 @@ class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     message: BaseMessage
     last_message: Optional[BaseMessage] = None
     is_interruptible: bool = True
+    hang_up: bool = False
 
 
 class AgentResponseStop(AgentResponse, type=AgentResponseType.STOP.value):

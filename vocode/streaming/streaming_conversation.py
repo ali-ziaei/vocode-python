@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import datetime
 import json
 import logging
@@ -9,7 +10,6 @@ import random
 import threading
 import time
 import typing
-import copy
 from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, cast
 
 from vocode.streaming.action.worker import ActionsWorker
@@ -586,6 +586,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         agent_response_message.message,
                         agent_response_message.last_message,
                         synthesis_result,
+                        agent_response_message.hangs_up,
                     ),
                     is_interruptible=item.is_interruptible,
                     agent_response_tracker=item.agent_response_tracker,
@@ -613,7 +614,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, last_message, synthesis_result = item.payload
+                message, last_message, synthesis_result, hangs_up = item.payload
                 if last_message is None:
                     last_message = BaseMessage(text="")
                 # create an empty transcript message and attach it to the transcript
@@ -638,6 +639,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.synthesizer.get_synthesizer_config().text_to_speech_chunk_size_seconds,
                     transcript_message=transcript_message,
                 )
+                if hangs_up:
+                    await self.conversation.terminate()
                 self.conversation.spoken_metadata.agent_last_spoken_end_time = (
                     time.time()
                 )

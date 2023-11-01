@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import time
 from typing import Any, AsyncGenerator, Optional, Tuple, Union
@@ -22,6 +23,7 @@ from vocode.streaming.models.message import BaseMessage, SSMLMessage
 from vocode.streaming.utils.mp3_helper import decode_mp3
 from vocode.streaming.synthesizer.miniaudio_worker import MiniaudioWorker
 from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
+from vocode.utils.sentry import sentry_probe, set_span_data
 
 ADAM_VOICE_ID = "pNInz6obpgDQGcFmaJgB"
 ELEVEN_LABS_BASE_URL = "https://api.elevenlabs.io/v1/"
@@ -55,6 +57,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
     ) -> AsyncGenerator[SynthesisResult.ChunkResult, None]:
         yield SynthesisResult.ChunkResult(cached_audio, True)
 
+    @sentry_probe("synthesize")
     async def create_speech(
         self,
         message: BaseMessage,
@@ -62,6 +65,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         bot_sentiment: Optional[BotSentiment] = None,
         conversation_id: Optional[str] = None,
     ) -> SynthesisResult:
+        set_span_data({"message": message.text, "provider": "ElevenLabs"})
         voice = self.elevenlabs.Voice(voice_id=self.voice_id)
         if self.stability is not None and self.similarity_boost is not None:
             voice.settings = self.elevenlabs.VoiceSettings(

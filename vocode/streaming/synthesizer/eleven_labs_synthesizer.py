@@ -53,9 +53,17 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         self.logger = logger or logging.getLogger(__name__)
 
     async def cached_chunk_generator(
-        self, cached_audio: bytes
+        self,
+        cached_audio: bytes,
+        chunk_size: int,
     ) -> AsyncGenerator[SynthesisResult.ChunkResult, None]:
-        yield SynthesisResult.ChunkResult(cached_audio, True)
+        for i in range(0, len(cached_audio), chunk_size):
+            if i + chunk_size > len(cached_audio):
+                yield SynthesisResult.ChunkResult(cached_audio[i:], True)
+            else:
+                yield SynthesisResult.ChunkResult(
+                    cached_audio[i : i + chunk_size], False
+                )
 
     @sentry_probe("synthesize")
     async def create_speech(
@@ -156,7 +164,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         # Each of the branches below use the cached audio to generate a response
         if self.experimental_streaming:
             synthesis_result = SynthesisResult(
-                self.cached_chunk_generator(audio_data),
+                self.cached_chunk_generator(audio_data, chunk_size=chunk_size),
                 lambda seconds: self.get_message_cutoff_from_voice_speed(
                     message, seconds, self.words_per_minute
                 ),

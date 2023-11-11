@@ -595,6 +595,48 @@ class StreamingConversation(Generic[OutputDeviceType]):
             except asyncio.CancelledError:
                 pass
 
+    class AgentPostProcessingResponsesWorker(InterruptibleAgentResponseWorker):
+        """Runs Synthesizer.create_speech and sends the SynthesisResult to the output queue"""
+
+        def __init__(
+            self,
+            input_queue: asyncio.Queue[InterruptibleAgentResponseEvent[AgentResponse]],
+            output_queue: asyncio.Queue[
+                InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]]
+            ],
+            conversation: "StreamingConversation",
+            interruptible_event_factory: InterruptibleEventFactory,
+        ):
+            super().__init__(
+                input_queue=input_queue,
+                output_queue=output_queue,
+            )
+            self.input_queue = input_queue
+            self.output_queue = output_queue
+            self.conversation = conversation
+            self.interruptible_event_factory = interruptible_event_factory
+
+        async def process(self, item: InterruptibleAgentResponseEvent[AgentResponse]):
+            if not self.conversation.synthesis_enabled:
+                self.conversation.logger.debug(
+                    "Synthesis disabled, not synthesizing speech"
+                )
+                return
+            try:
+                message, last_message, synthesis_result, hangs_up = item.payload
+                self.produce_interruptible_agent_response_event_nonblocking(
+                    (
+                        message,
+                        last_message,
+                        synthesis_result,
+                        hangs_up,
+                    ),
+                    is_interruptible=item.is_interruptible,
+                    agent_response_tracker=item.agent_response_tracker,
+                )
+            except asyncio.CancelledError:
+                pass
+
     class SynthesisResultsWorker(InterruptibleAgentResponseWorker):
         """Plays SynthesisResults from the output queue on the output device"""
 
@@ -857,13 +899,26 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
         )
 
+        self.agent_postprocessing_responses_queue: asyncio.Queue[
+            InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]]
+        ] = asyncio.Queue()
+
         self.agent.attach_conversation_state_manager(self.state_manager)
         self.agent_responses_worker = self.AgentResponsesWorker(
             input_queue=self.agent.get_output_queue(),
-            output_queue=self.synthesis_results_queue,
+            output_queue=self.agent_postprocessing_responses_queue,
             conversation=self,
             interruptible_event_factory=self.interruptible_event_factory,
         )
+        self.agent_postprocessing_responses_worker = (
+            self.AgentPostProcessingResponsesWorker(
+                input_queue=self.agent_postprocessing_responses_queue,
+                output_queue=self.synthesis_results_queue,
+                conversation=self,
+                interruptible_event_factory=self.interruptible_event_factory,
+            )
+        )
+
         self.actions_worker = None
         if self.agent.get_agent_config().actions:
             self.actions_worker = ActionsWorker(
@@ -929,6 +984,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.transcriptions_worker.start()
         self.transcriptions_postprocessing_worker.start()
         self.agent_responses_worker.start()
+        self.agent_postprocessing_responses_worker.start()
         self.synthesis_results_worker.start()
         self.output_device.start()
         if self.filler_audio_worker is not None:
@@ -1047,6 +1103,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 break
         self.agent.cancel_current_task()
         self.agent_responses_worker.cancel_current_task()
+        self.agent_postprocessing_responses_worker.cancel_current_task()
         return num_interrupts > 0
 
     def is_interrupt(self, transcription: Transcription):
@@ -1188,6 +1245,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.transcriptions_postprocessing_worker.terminate()
         self.logger.debug("Terminating final transcriptions worker(s)")
         self.agent_responses_worker.terminate()
+        self.agent_postprocessing_responses_worker.terminate()
         self.logger.debug("Terminating synthesis results worker")
         self.synthesis_results_worker.terminate()
         if self.filler_audio_worker is not None:

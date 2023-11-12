@@ -99,6 +99,8 @@ class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     last_message: Optional[BaseMessage] = None
     is_interruptible: bool = True
     hangs_up: bool = False
+    is_endpoint: bool = True
+    turn_uuid: str = ""
 
 
 class AgentResponseStop(AgentResponse, type=AgentResponseType.STOP.value):
@@ -222,7 +224,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         )
         is_first_response = True
         function_call = None
-        async for response, last_content, is_interruptible, hangs_up in responses:
+        async for response, last_content, is_interruptible, hangs_up, is_endpoint, turn_uuid in responses:
             if isinstance(response, FunctionCall):
                 function_call = response
                 continue
@@ -234,6 +236,8 @@ class RespondAgent(BaseAgent[AgentConfigType]):
                     message=BaseMessage(text=response),
                     last_message=BaseMessage(text=last_content),
                     hangs_up=hangs_up,
+                    is_endpoint=is_endpoint,
+                    turn_uuid=turn_uuid,
                 ),
                 is_interruptible=self.agent_config.allow_agent_to_be_cut_off
                 and is_interruptible

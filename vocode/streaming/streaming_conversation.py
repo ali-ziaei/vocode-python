@@ -642,7 +642,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.results.append(
                     (item, message, last_message, synthesis_result, hangs_up)
                 )
-                if self.counter % 10 == 0:
+                if self.counter % 3 == 0:
                     self.publish(
                         item, message, last_message, synthesis_result, hangs_up
                     )

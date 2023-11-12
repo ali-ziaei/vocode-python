@@ -663,6 +663,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             agent_response_tracker=item.agent_response_tracker,
                         )
             self.buffer = []
+            self.current_uid_in_buffer = None
 
         async def process(self, item: InterruptibleAgentResponseEvent[AgentResponse]):
             try:

@@ -615,15 +615,14 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
+            self.counter = -1
+            self.results = []
 
-        async def process(self, item: InterruptibleAgentResponseEvent[AgentResponse]):
-            if not self.conversation.synthesis_enabled:
-                self.conversation.logger.debug(
-                    "Synthesis disabled, not synthesizing speech"
-                )
-                return
-            try:
-                message, last_message, synthesis_result, hangs_up = item.payload
+        def flush(self):
+            self.results = []
+
+        def publish(self, item, message, last_message, synthesis_result, hangs_up):
+            for item, message, last_message, synthesis_result, hangs_up in self.results:
                 self.produce_interruptible_agent_response_event_nonblocking(
                     (
                         message,
@@ -631,9 +630,23 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         synthesis_result,
                         hangs_up,
                     ),
-                    is_interruptible=item.is_interruptible,
+                    is_interruptible=True,
                     agent_response_tracker=item.agent_response_tracker,
                 )
+            self.results = []
+
+        async def process(self, item: InterruptibleAgentResponseEvent[AgentResponse]):
+            self.counter += 1
+            try:
+                message, last_message, synthesis_result, hangs_up = item.payload
+                self.results.append(
+                    (item, message, last_message, synthesis_result, hangs_up)
+                )
+                if self.counter % 10 == 0:
+                    self.publish(
+                        item, message, last_message, synthesis_result, hangs_up
+                    )
+
             except asyncio.CancelledError:
                 pass
 

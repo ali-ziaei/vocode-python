@@ -630,9 +630,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         def flush(self):
             self.buffer = []
 
-        def publish(
-            self, item, message, last_message, synthesis_result, hangs_up, turn_uuid
-        ):
+        def publish(self):
             for (
                 item,
                 message,
@@ -703,14 +701,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                 # where we need to check is endpoint
                 if is_endpoint:
-                    self.publish(
-                        item,
-                        message,
-                        last_message,
-                        synthesis_result,
-                        hangs_up,
-                        turn_uuid,
-                    )
+                    self.publish()
             except asyncio.CancelledError:
                 pass
 

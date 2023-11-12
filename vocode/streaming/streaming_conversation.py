@@ -930,6 +930,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.spoken_metadata = SpokenMetaData()
 
         self.agent_filler_config = self.agent.get_agent_config().agent_filler_config
+        self.agent_endpoint_config = self.agent.get_agent_config().agent_endpoint_config
+
         self.num_retry_ask_more_time_in_row = 0
         self.num_retry_speak_up_in_row = 0
 

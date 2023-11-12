@@ -226,6 +226,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         message=filler_message,
                         is_endpoint=False,
                         turn_uuid=str(uuid.uuid4()),
+                        is_filler=True,
                     ),
                     is_interruptible=False,
                 )
@@ -594,6 +595,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         agent_response_message.hangs_up,
                         agent_response_message.is_endpoint,
                         agent_response_message.turn_uuid,
+                        agent_response_message.is_filler,
                     ),
                     is_interruptible=False,
                     agent_response_tracker=item.agent_response_tracker,
@@ -673,7 +675,22 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     hangs_up,
                     is_endpoint,
                     turn_uuid,
+                    is_filler,
                 ) = item.payload
+
+                if is_filler:
+                    self.produce_interruptible_agent_response_event_nonblocking(
+                        (
+                            message,
+                            last_message,
+                            synthesis_result,
+                            hangs_up,
+                        ),
+                        is_interruptible=False,
+                        agent_response_tracker=item.agent_response_tracker,
+                    )
+                    return
+
                 if self.current_uid_in_buffer is None:
                     self.current_uid_in_buffer = turn_uuid
 
@@ -855,6 +872,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                     ),
                                     is_endpoint=False,
                                     turn_uuid=str(uuid.uuid4()),
+                                    is_filler=True,
                                 ),
                                 is_interruptible=False,
                             )

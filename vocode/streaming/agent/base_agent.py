@@ -236,7 +236,8 @@ class RespondAgent(BaseAgent[AgentConfigType]):
                     hangs_up=hangs_up,
                 ),
                 is_interruptible=self.agent_config.allow_agent_to_be_cut_off
-                and is_interruptible,
+                and is_interruptible
+                and False,
                 agent_response_tracker=agent_input.agent_response_tracker,
             )
         # TODO: implement should_stop for generate_responses

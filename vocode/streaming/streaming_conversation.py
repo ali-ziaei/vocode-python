@@ -222,7 +222,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                 agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
                     AgentResponseMessage(message=filler_message),
-                    is_interruptible=True,
+                    is_interruptible=False,
                 )
                 self.conversation.agent_responses_worker.consume_nonblocking(
                     agent_response_event
@@ -588,7 +588,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         synthesis_result,
                         agent_response_message.hangs_up,
                     ),
-                    is_interruptible=item.is_interruptible,
+                    is_interruptible=False,
                     agent_response_tracker=item.agent_response_tracker,
                 )
                 self.conversation.num_retry_ask_more_time_in_row = 0
@@ -615,14 +615,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_queue = output_queue
             self.conversation = conversation
             self.interruptible_event_factory = interruptible_event_factory
-            self.counter = -1
-            self.results = []
+            self.buffer = []
 
         def flush(self):
-            self.results = []
+            self.buffer = []
 
         def publish(self, item, message, last_message, synthesis_result, hangs_up):
-            for item, message, last_message, synthesis_result, hangs_up in self.results:
+            for item, message, last_message, synthesis_result, hangs_up in self.buffer:
                 self.produce_interruptible_agent_response_event_nonblocking(
                     (
                         message,
@@ -633,20 +632,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     is_interruptible=True,
                     agent_response_tracker=item.agent_response_tracker,
                 )
-            self.results = []
+            self.buffer = []
 
         async def process(self, item: InterruptibleAgentResponseEvent[AgentResponse]):
-            self.counter += 1
             try:
                 message, last_message, synthesis_result, hangs_up = item.payload
-                self.results.append(
+                self.buffer.append(
                     (item, message, last_message, synthesis_result, hangs_up)
                 )
-                if self.counter % 3 == 0:
-                    self.publish(
-                        item, message, last_message, synthesis_result, hangs_up
-                    )
-
+                # where we need to check is endpoint
+                self.publish(item, message, last_message, synthesis_result, hangs_up)
             except asyncio.CancelledError:
                 pass
 
@@ -807,7 +802,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                         text=self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
                                     )
                                 ),
-                                is_interruptible=True,
+                                is_interruptible=False,
                             )
                             self.conversation.agent_responses_worker.consume_nonblocking(
                                 agent_response_event

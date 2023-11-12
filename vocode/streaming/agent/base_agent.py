@@ -218,32 +218,24 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         agent_span_first = tracer.start_span(
             f"{tracer_name_start}.generate_first"  # type: ignore
         )
-        responses = self.generate_response(
+        agent_response_messages = self.generate_response(
             transcription.message,
             is_interrupt=transcription.is_interrupt,
             conversation_id=conversation_id,
         )
         is_first_response = True
         function_call = None
-        async for response, last_content, is_interruptible, hangs_up, is_endpoint, turn_uuid, is_filler in responses:
-            if isinstance(response, FunctionCall):
-                function_call = response
+
+        async for agent_response_message in agent_response_messages:
+            if isinstance(agent_response_message, FunctionCall):
+                function_call = agent_response_message.message
                 continue
             if is_first_response:
                 agent_span_first.end()
                 is_first_response = False
             self.produce_interruptible_agent_response_event_nonblocking(
-                AgentResponseMessage(
-                    message=BaseMessage(text=response),
-                    last_message=BaseMessage(text=last_content),
-                    hangs_up=hangs_up,
-                    is_endpoint=is_endpoint,
-                    turn_uuid=turn_uuid,
-                    is_filler=is_filler,
-                ),
-                is_interruptible=self.agent_config.allow_agent_to_be_cut_off
-                and is_interruptible
-                and False,
+                agent_response_message,
+                is_interruptible=False,
                 agent_response_tracker=agent_input.agent_response_tracker,
             )
         # TODO: implement should_stop for generate_responses

@@ -299,7 +299,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         async def publish_agent_response(self):
             current_time = time.time()
-            if self.conversation.spoken_metadata.customer_last_spoken_end_time:
+            if (
+                self.conversation.spoken_metadata.customer_last_spoken_end_time
+                and self.conversation.agent_postprocessing_responses_worker.buffer
+            ):
                 if (
                     not self.conversation.agent_postprocessing_responses_worker.is_publishing
                 ):

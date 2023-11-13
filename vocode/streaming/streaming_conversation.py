@@ -671,7 +671,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             )
                 self.conversation.events_manager.publish_event(
                     AgentResponseMessageEvent(
-                        agent_response_message=agent_response_message
+                        conversation_id=self.conversation.id,
+                        agent_response_message=agent_response_message,
                     )
                 )
                 self.buffer = []

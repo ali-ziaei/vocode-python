@@ -728,8 +728,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
         ):
             try:
                 agent_response_message, synthesis_result = item.payload
-                if last_message is None:
-                    last_message = BaseMessage(text="")
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
                     text="",

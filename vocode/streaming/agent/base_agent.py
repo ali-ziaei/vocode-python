@@ -19,6 +19,7 @@ from typing import (
 
 from opentelemetry import trace
 from opentelemetry.trace import Span
+from vocode.streaming.models.events import Event, EventType
 
 from vocode.streaming.action.factory import ActionFactory
 from vocode.streaming.action.phone_call_action import (
@@ -106,6 +107,10 @@ class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     info_utt_dict: dict = {}
     customer_utt_dict: dict = {}
     agent_utt_dict: dict = {}
+
+
+class AgentResponseMessageEvent(Event, type=EventType.AGENT_RESPONSE_MESSAGE):
+    agent_response_message: AgentResponseMessage
 
 
 class AgentResponseStop(AgentResponse, type=AgentResponseType.STOP.value):

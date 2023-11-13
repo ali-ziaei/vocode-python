@@ -669,15 +669,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 is_interruptible=True,
                                 agent_response_tracker=item.agent_response_tracker,
                             )
-                self.conversation.events_manager.publish_event(
-                    AgentResponseMessageEvent(
-                        conversation_id=self.conversation.id,
-                        agent_response_message=agent_response_message,
+                if agent_response_message.can_be_published:
+                    self.conversation.events_manager.publish_event(
+                        AgentResponseMessageEvent(
+                            conversation_id=self.conversation.id,
+                            agent_response_message=agent_response_message,
+                        )
                     )
-                )
-                self.buffer = []
-                self.current_uid_in_buffer = None
-                self.is_publishing = False
+            self.buffer = []
+            self.current_uid_in_buffer = None
+            self.is_publishing = False
 
         async def process(self, item: InterruptibleAgentResponseEvent[AgentResponse]):
             try:

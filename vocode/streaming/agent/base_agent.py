@@ -460,6 +460,6 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         conversation_id: str,
         is_interrupt: bool = False,
     ) -> AsyncGenerator[
-        Tuple[Union[str, FunctionCall], Union[str, FunctionCall], bool], None
+        Tuple[AgentResponseMessage, None]
     ]:  # tuple of the content and whether it is interruptible
         raise NotImplementedError

@@ -297,12 +297,27 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
                     self.conversation.logger.debug(log_message, context=context)
 
+        async def publish_agent_response(self):
+            current_time = time.time()
+            if self.conversation.spoken_metadata.customer_last_spoken_end_time:
+                if (
+                    not self.conversation.agent_postprocessing_responses_worker.is_publishing
+                ):
+                    if (
+                        current_time
+                        - self.conversation.spoken_metadata.customer_last_spoken_end_time
+                        > self.conversation.agent_endpoint_config.time_out
+                    ):
+                        self.conversation.agent_postprocessing_responses_worker.publish()
+                        return
+
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
             await asyncio.gather(
                 self.publish_ask_more_time_filler(),
                 self.publish_ask_speak_up_filler(),
                 self.publish_asr_result(),
+                self.publish_agent_response(),
             )
 
     class TranscriptionsWorker(AsyncQueueWorker):
@@ -626,11 +641,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.interruptible_event_factory = interruptible_event_factory
             self.buffer = []
             self.current_uid_in_buffer = None
+            self.is_publishing = False
 
         def flush(self):
             self.buffer = []
 
         def publish(self):
+            self.is_publishing = True
             for (
                 item,
                 message,
@@ -664,6 +681,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         )
             self.buffer = []
             self.current_uid_in_buffer = None
+            self.is_publishing = False
 
         async def process(self, item: InterruptibleAgentResponseEvent[AgentResponse]):
             try:

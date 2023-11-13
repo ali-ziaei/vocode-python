@@ -102,6 +102,7 @@ class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     is_endpoint: bool = True
     turn_uuid: str = ""
     is_filler: bool = False
+    can_be_sent_to_tts: bool = True
     info_utt_dict: dict = {}
     customer_utt_dict: dict = {}
     agent_utt_dict: dict = {}

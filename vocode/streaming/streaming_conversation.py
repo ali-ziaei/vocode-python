@@ -820,7 +820,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
-                    message_sent_total = last_message.text + " " + message_sent
+                    message_sent_total = (
+                        agent_response_message.last_message.text + " " + message_sent
+                    )
                     message_sent_total = " ".join(message_sent_total.split()).strip()
                     if (
                         len(message_sent_total.split())

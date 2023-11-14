@@ -113,6 +113,8 @@ class AgentConfig(TypedModel, type=AgentType.BASE.value):
     actions: Optional[List[ActionConfig]] = None
     agent_filler_config: Optional[AgentFillerConfig] = None
     agent_endpoint_config: Optional[AgentEndpointConfig] = None
+    let_customer_lead_time_out: Optional[float] = None
+    ask_for_greeting_message_token: Optional[str] = None
 
 
 class CutOffResponse(BaseModel):

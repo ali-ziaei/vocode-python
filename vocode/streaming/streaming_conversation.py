@@ -23,12 +23,14 @@ from vocode.streaming.agent.base_agent import (
     BaseAgent,
     TranscriptionAgentInput,
 )
+import uuid
 from vocode.streaming.agent.bot_sentiment_analyser import BotSentimentAnalyser
 from vocode.streaming.agent.chat_gpt_agent import ChatGPTAgent
 from vocode.streaming.audio.base_audio_service import BaseThreadAsyncAudioService
 from vocode.streaming.constants import ALLOWED_IDLE_TIME, PER_CHUNK_ALLOWANCE_SECONDS
 from vocode.streaming.models.actions import ActionInput
 from vocode.streaming.models.agent import ChatGPTAgentConfig, FillerAudioConfig
+from vocode.streaming.agent.base_agent import AgentResponseMessageEvent
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.models.events import FillerEvent, Sender, SpokenMetaData
 from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
@@ -221,8 +223,14 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.transcriber.mute()
 
                 agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
-                    AgentResponseMessage(message=filler_message),
-                    is_interruptible=True,
+                    AgentResponseMessage(
+                        message=filler_message,
+                        is_endpoint=False,
+                        turn_uuid=str(uuid.uuid4()),
+                        is_filler=True,
+                        can_be_sent_to_tts=True,
+                    ),
+                    is_interruptible=False,
                 )
                 self.conversation.agent_responses_worker.consume_nonblocking(
                     agent_response_event
@@ -291,12 +299,30 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
                     self.conversation.logger.debug(log_message, context=context)
 
+        async def publish_agent_response(self):
+            current_time = time.time()
+            if (
+                self.conversation.spoken_metadata.customer_last_spoken_end_time
+                and self.conversation.agent_postprocessing_responses_worker.buffer
+            ):
+                if (
+                    not self.conversation.agent_postprocessing_responses_worker.is_publishing
+                ):
+                    if (
+                        current_time
+                        - self.conversation.spoken_metadata.customer_last_spoken_end_time
+                        > self.conversation.agent_endpoint_config.time_out
+                    ):
+                        self.conversation.agent_postprocessing_responses_worker.publish()
+                        return
+
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
             await asyncio.gather(
                 self.publish_ask_more_time_filler(),
                 self.publish_ask_speak_up_filler(),
                 self.publish_asr_result(),
+                self.publish_agent_response(),
             )
 
     class TranscriptionsWorker(AsyncQueueWorker):
@@ -583,15 +609,103 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.produce_interruptible_agent_response_event_nonblocking(
                     (
-                        agent_response_message.message,
-                        agent_response_message.last_message,
+                        agent_response_message,
                         synthesis_result,
-                        agent_response_message.hangs_up,
                     ),
-                    is_interruptible=item.is_interruptible,
+                    is_interruptible=False,
                     agent_response_tracker=item.agent_response_tracker,
                 )
                 self.conversation.num_retry_ask_more_time_in_row = 0
+            except asyncio.CancelledError:
+                pass
+
+    class AgentPostProcessingResponsesWorker(InterruptibleAgentResponseWorker):
+        """Runs Synthesizer.create_speech and sends the SynthesisResult to the output queue"""
+
+        def __init__(
+            self,
+            input_queue: asyncio.Queue[InterruptibleAgentResponseEvent[AgentResponse]],
+            output_queue: asyncio.Queue[
+                InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]]
+            ],
+            conversation: "StreamingConversation",
+            interruptible_event_factory: InterruptibleEventFactory,
+        ):
+            super().__init__(
+                input_queue=input_queue,
+                output_queue=output_queue,
+            )
+            self.input_queue = input_queue
+            self.output_queue = output_queue
+            self.conversation = conversation
+            self.interruptible_event_factory = interruptible_event_factory
+            self.buffer = []
+            self.current_uid_in_buffer = None
+            self.is_publishing = False
+
+        def flush(self):
+            self.buffer = []
+
+        def publish(self):
+            self.is_publishing = True
+            for item, agent_response_message, synthesis_result in self.buffer:
+                if agent_response_message.can_be_sent_to_tts:
+                    if self.conversation.interrupted_turn_uuid is None:
+                        self.produce_interruptible_agent_response_event_nonblocking(
+                            (agent_response_message, synthesis_result),
+                            is_interruptible=True,
+                            agent_response_tracker=item.agent_response_tracker,
+                        )
+                    else:
+                        if (
+                            agent_response_message.turn_uuid
+                            != self.conversation.interrupted_turn_uuid
+                        ):
+                            self.produce_interruptible_agent_response_event_nonblocking(
+                                (
+                                    agent_response_message,
+                                    synthesis_result,
+                                ),
+                                is_interruptible=True,
+                                agent_response_tracker=item.agent_response_tracker,
+                            )
+                if agent_response_message.can_be_published:
+                    self.conversation.events_manager.publish_event(
+                        AgentResponseMessageEvent(
+                            conversation_id=self.conversation.id,
+                            agent_response_message=agent_response_message,
+                        )
+                    )
+            self.buffer = []
+            self.current_uid_in_buffer = None
+            self.is_publishing = False
+
+        async def process(self, item: InterruptibleAgentResponseEvent[AgentResponse]):
+            try:
+                agent_response_message, synthesis_result = item.payload
+
+                if agent_response_message.is_filler:
+                    self.produce_interruptible_agent_response_event_nonblocking(
+                        (
+                            agent_response_message,
+                            synthesis_result,
+                        ),
+                        is_interruptible=False,
+                        agent_response_tracker=item.agent_response_tracker,
+                    )
+                    return
+
+                if self.current_uid_in_buffer is None:
+                    self.current_uid_in_buffer = agent_response_message.turn_uuid
+
+                if agent_response_message.turn_uuid != self.current_uid_in_buffer:
+                    self.buffer = []
+
+                self.buffer.append((item, agent_response_message, synthesis_result))
+
+                # where we need to check is endpoint
+                if agent_response_message.is_endpoint:
+                    self.publish()
             except asyncio.CancelledError:
                 pass
 
@@ -614,9 +728,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, last_message, synthesis_result, hangs_up = item.payload
-                if last_message is None:
-                    last_message = BaseMessage(text="")
+                agent_response_message, synthesis_result = item.payload
                 # create an empty transcript message and attach it to the transcript
                 transcript_message = Message(
                     text="",
@@ -632,14 +744,14 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
                 self.conversation.spoken_metadata.agent_last_spoken_end_time = None
                 self.conversation.spoken_metadata.ready_to_publish_filler = False
-                message_sent, cut_off = await self.conversation.send_speech_to_output(
-                    message.text,
+                message_sent, _ = await self.conversation.send_speech_to_output(
+                    agent_response_message.message.text,
                     synthesis_result,
                     item.interruption_event,
                     self.conversation.synthesizer.get_synthesizer_config().text_to_speech_chunk_size_seconds,
                     transcript_message=transcript_message,
                 )
-                if hangs_up:
+                if agent_response_message.hangs_up:
                     await self.conversation.terminate()
                 self.conversation.spoken_metadata.agent_last_spoken_end_time = (
                     time.time()
@@ -709,7 +821,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
-                    message_sent_total = last_message.text + " " + message_sent
+                    message_sent_total = (
+                        agent_response_message.last_message.text + " " + message_sent
+                    )
                     message_sent_total = " ".join(message_sent_total.split()).strip()
                     if (
                         len(message_sent_total.split())
@@ -749,10 +863,14 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             agent_response_event = self.conversation.agent_responses_worker.interruptible_event_factory.create_interruptible_agent_response_event(
                                 AgentResponseMessage(
                                     message=BaseMessage(
-                                        text=self.conversation.agent_filler_config.agent_interrupt_customer.agent_message
-                                    )
+                                        text=self.conversation.agent_filler_config.agent_interrupt_customer.agent_message,
+                                    ),
+                                    is_endpoint=False,
+                                    turn_uuid=str(uuid.uuid4()),
+                                    is_filler=True,
+                                    can_be_sent_to_tts=True,
                                 ),
-                                is_interruptible=True,
+                                is_interruptible=False,
                             )
                             self.conversation.agent_responses_worker.consume_nonblocking(
                                 agent_response_event
@@ -802,11 +920,14 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.agent = agent
         self.asr_post_process_endpoint_sec = 0.0
         self.number_of_times_agent_interrupted_customer = -1
+        self.interrupted_turn_uuid = None
 
         # initiate filler pause tracking
         self.spoken_metadata = SpokenMetaData()
 
         self.agent_filler_config = self.agent.get_agent_config().agent_filler_config
+        self.agent_endpoint_config = self.agent.get_agent_config().agent_endpoint_config
+
         self.num_retry_ask_more_time_in_row = 0
         self.num_retry_speak_up_in_row = 0
 
@@ -857,13 +978,26 @@ class StreamingConversation(Generic[OutputDeviceType]):
             )
         )
 
+        self.agent_postprocessing_responses_queue: asyncio.Queue[
+            InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]]
+        ] = asyncio.Queue()
+
         self.agent.attach_conversation_state_manager(self.state_manager)
         self.agent_responses_worker = self.AgentResponsesWorker(
             input_queue=self.agent.get_output_queue(),
-            output_queue=self.synthesis_results_queue,
+            output_queue=self.agent_postprocessing_responses_queue,
             conversation=self,
             interruptible_event_factory=self.interruptible_event_factory,
         )
+        self.agent_postprocessing_responses_worker = (
+            self.AgentPostProcessingResponsesWorker(
+                input_queue=self.agent_postprocessing_responses_queue,
+                output_queue=self.synthesis_results_queue,
+                conversation=self,
+                interruptible_event_factory=self.interruptible_event_factory,
+            )
+        )
+
         self.actions_worker = None
         if self.agent.get_agent_config().actions:
             self.actions_worker = ActionsWorker(
@@ -929,6 +1063,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.transcriptions_worker.start()
         self.transcriptions_postprocessing_worker.start()
         self.agent_responses_worker.start()
+        self.agent_postprocessing_responses_worker.start()
         self.synthesis_results_worker.start()
         self.output_device.start()
         if self.filler_audio_worker is not None:
@@ -1041,12 +1176,17 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 interruptible_event = self.interruptible_events.get_nowait()
                 if not interruptible_event.is_interrupted():
                     if interruptible_event.interrupt():
+                        if isinstance(
+                            interruptible_event.payload, AgentResponseMessage
+                        ):
+                            self.interrupted_turn_uuid = interruptible_event.payload[-1]
                         self.logger.debug("Interrupting event")
                         num_interrupts += 1
             except queue.Empty:
                 break
         self.agent.cancel_current_task()
         self.agent_responses_worker.cancel_current_task()
+        self.agent_postprocessing_responses_worker.cancel_current_task()
         return num_interrupts > 0
 
     def is_interrupt(self, transcription: Transcription):
@@ -1188,6 +1328,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.transcriptions_postprocessing_worker.terminate()
         self.logger.debug("Terminating final transcriptions worker(s)")
         self.agent_responses_worker.terminate()
+        self.agent_postprocessing_responses_worker.terminate()
         self.logger.debug("Terminating synthesis results worker")
         self.synthesis_results_worker.terminate()
         if self.filler_audio_worker is not None:

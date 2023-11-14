@@ -19,6 +19,7 @@ class EventType(str, Enum):
     RECORDING = "event_recording"
     ACTION = "event_action"
     PUBLISH_FILLER = "publish_filler"
+    AGENT_RESPONSE_MESSAGE = "agent_response_message"
 
 
 class Event(TypedModel):

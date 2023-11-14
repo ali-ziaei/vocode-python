@@ -19,6 +19,7 @@ from typing import (
 
 from opentelemetry import trace
 from opentelemetry.trace import Span
+from vocode.streaming.models.events import Event, EventType
 
 from vocode.streaming.action.factory import ActionFactory
 from vocode.streaming.action.phone_call_action import (
@@ -99,6 +100,18 @@ class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     last_message: Optional[BaseMessage] = None
     is_interruptible: bool = True
     hangs_up: bool = False
+    is_endpoint: bool = True
+    turn_uuid: str = ""
+    is_filler: bool = False
+    can_be_sent_to_tts: bool = True
+    can_be_published: bool = True
+    info_utt_dict: dict = {}
+    customer_utt_dict: dict = {}
+    agent_utt_dict: dict = {}
+
+
+class AgentResponseMessageEvent(Event, type=EventType.AGENT_RESPONSE_MESSAGE):
+    agent_response_message: AgentResponseMessage
 
 
 class AgentResponseStop(AgentResponse, type=AgentResponseType.STOP.value):
@@ -215,28 +228,24 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         agent_span_first = tracer.start_span(
             f"{tracer_name_start}.generate_first"  # type: ignore
         )
-        responses = self.generate_response(
+        agent_response_messages = self.generate_response(
             transcription.message,
             is_interrupt=transcription.is_interrupt,
             conversation_id=conversation_id,
         )
         is_first_response = True
         function_call = None
-        async for response, last_content, is_interruptible, hangs_up in responses:
-            if isinstance(response, FunctionCall):
-                function_call = response
+
+        async for agent_response_message in agent_response_messages:
+            if isinstance(agent_response_message, FunctionCall):
+                function_call = agent_response_message.message
                 continue
             if is_first_response:
                 agent_span_first.end()
                 is_first_response = False
             self.produce_interruptible_agent_response_event_nonblocking(
-                AgentResponseMessage(
-                    message=BaseMessage(text=response),
-                    last_message=BaseMessage(text=last_content),
-                    hangs_up=hangs_up,
-                ),
-                is_interruptible=self.agent_config.allow_agent_to_be_cut_off
-                and is_interruptible,
+                agent_response_message,
+                is_interruptible=False,
                 agent_response_tracker=agent_input.agent_response_tracker,
             )
         # TODO: implement should_stop for generate_responses
@@ -451,6 +460,6 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         conversation_id: str,
         is_interrupt: bool = False,
     ) -> AsyncGenerator[
-        Tuple[Union[str, FunctionCall], Union[str, FunctionCall], bool], None
+        Tuple[AgentResponseMessage, None]
     ]:  # tuple of the content and whether it is interruptible
         raise NotImplementedError

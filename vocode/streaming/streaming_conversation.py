@@ -272,21 +272,23 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         async def publish_asr_result(self):
             current_time = time.time()
-            if not self.conversation.asked_for_greeting_message_token:
-                if self.conversation.agent_config.let_customer_lead_time_out:
-                    if self.conversation.agent_config.ask_for_greeting_message_token:
+            if not self.conversation.asked_for_greeting_message:
+                if self.conversation.agent_config.customer_speak_first_time_out:
+                    if (
+                        self.conversation.agent_config.ask_for_greeting_message_special_token
+                    ):
                         if (
                             self.conversation.transcriptions_worker.is_speaking_at
                             is None
                         ):
                             if (
                                 current_time - self.conversation.call_start_time
-                                >= self.conversation.agent_config.let_customer_lead_time_out
+                                >= self.conversation.agent_config.customer_speak_first_time_out
                             ):
                                 event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                                     TranscriptionAgentInput(
                                         transcription=Transcription(
-                                            message=self.conversation.agent_config.ask_for_greeting_message_token,
+                                            message=self.conversation.agent_config.ask_for_greeting_message_special_token,
                                             confidence=1.0,
                                             is_final=True,
                                             is_interrupt=False,
@@ -305,9 +307,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.agent.get_input_queue().put(
                                     event
                                 )
-                                self.conversation.asked_for_greeting_message_token = (
-                                    True
-                                )
+                                self.conversation.asked_for_greeting_message = True
                                 return
 
             if not self.conversation.transcriptions_worker.is_speaking_at:
@@ -961,7 +961,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.number_of_times_agent_interrupted_customer = -1
         self.interrupted_turn_uuid = None
         self.call_start_time = None
-        self.asked_for_greeting_message_token = False
+        self.asked_for_greeting_message = False
 
         # initiate filler pause tracking
         self.spoken_metadata = SpokenMetaData()
@@ -1129,7 +1129,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.agent.start()
         initial_message = self.agent.get_agent_config().initial_message
         if initial_message:
-            if self.agent_config.let_customer_lead_time_out is None:
+            if self.agent_config.customer_speak_first_time_out is None:
                 asyncio.create_task(self.send_initial_message(initial_message))
         self.agent.attach_transcript(self.transcript)
         if mark_ready:

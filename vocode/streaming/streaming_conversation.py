@@ -285,7 +285,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             ):
                                 event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                                     TranscriptionAgentInput(
-                                        transcription=self.conversation.agent_config.ask_for_greeting_message_token,
+                                        transcription=Transcription(
+                                            message=self.conversation.agent_config.ask_for_greeting_message_token,
+                                            confidence=1.0,
+                                            is_final=True,
+                                            is_interrupt=False,
+                                            latency=0.0,
+                                        ),
                                         conversation_id=self.conversation.id,
                                         vonage_uuid=getattr(
                                             self.conversation, "vonage_uuid", None

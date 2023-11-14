@@ -271,11 +271,44 @@ class StreamingConversation(Generic[OutputDeviceType]):
             return transcription_should_be_sent_to_llm
 
         async def publish_asr_result(self):
+            current_time = time.time()
+            if not self.conversation.asked_for_greeting_message_token:
+                if self.conversation.agent_config.let_customer_lead_time_out:
+                    if self.conversation.agent_config.ask_for_greeting_message_token:
+                        if (
+                            self.conversation.transcriptions_worker.is_speaking_at
+                            is None
+                        ):
+                            if (
+                                current_time - self.conversation.call_start_time
+                                >= self.conversation.agent_config.let_customer_lead_time_out
+                            ):
+                                event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
+                                    TranscriptionAgentInput(
+                                        transcription=self.conversation.agent_config.ask_for_greeting_message_token,
+                                        conversation_id=self.conversation.id,
+                                        vonage_uuid=getattr(
+                                            self.conversation, "vonage_uuid", None
+                                        ),
+                                        twilio_sid=getattr(
+                                            self.conversation, "twilio_sid", None
+                                        ),
+                                    ),
+                                    is_interruptible=False,
+                                )
+                                await self.conversation.agent.get_input_queue().put(
+                                    event
+                                )
+                                self.conversation.asked_for_greeting_message_token = (
+                                    True
+                                )
+                                return
+
             if not self.conversation.transcriptions_worker.is_speaking_at:
                 return
 
             wait_time = (
-                time.time() - self.conversation.transcriptions_worker.is_speaking_at
+                current_time - self.conversation.transcriptions_worker.is_speaking_at
             )
 
             if wait_time >= self.conversation.asr_post_process_endpoint_sec:
@@ -921,10 +954,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.asr_post_process_endpoint_sec = 0.0
         self.number_of_times_agent_interrupted_customer = -1
         self.interrupted_turn_uuid = None
+        self.call_start_time = None
+        self.asked_for_greeting_message_token = False
 
         # initiate filler pause tracking
         self.spoken_metadata = SpokenMetaData()
 
+        self.agent_config = self.agent.get_agent_config()
         self.agent_filler_config = self.agent.get_agent_config().agent_filler_config
         self.agent_endpoint_config = self.agent.get_agent_config().agent_endpoint_config
 
@@ -1087,7 +1123,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.agent.start()
         initial_message = self.agent.get_agent_config().initial_message
         if initial_message:
-            asyncio.create_task(self.send_initial_message(initial_message))
+            if self.agent_config.let_customer_lead_time_out is None:
+                asyncio.create_task(self.send_initial_message(initial_message))
         self.agent.attach_transcript(self.transcript)
         if mark_ready:
             await mark_ready()
@@ -1101,6 +1138,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.check_for_idle_task = asyncio.create_task(self.check_for_idle())
         if len(self.events_manager.subscriptions) > 0:
             self.events_task = asyncio.create_task(self.events_manager.start())
+
+        self.call_start_time = time.time()
 
     async def send_initial_message(self, initial_message: BaseMessage):
         # TODO: configure if initial message is interruptible

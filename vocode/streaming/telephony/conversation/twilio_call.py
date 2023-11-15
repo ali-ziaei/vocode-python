@@ -85,6 +85,9 @@ class TwilioCall(Call[TwilioOutputDevice]):
             self.twilio_config.recording_url = (
                 f"{twilio_config.recording_url}/{conversation_id}"
             )
+            self.twilio_config.events_url = (
+                f"{twilio_config.events_url}/{conversation_id}"
+            )
         else:
             self.twilio_config = TwilioConfig(
                 account_sid=getenv("TWILIO_ACCOUNT_SID"),

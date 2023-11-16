@@ -1,9 +1,17 @@
+import os
 from typing import Optional
+from redis import Redis
 from twilio.rest import Client
 
 from vocode.streaming.models.telephony import BaseCallConfig, TwilioConfig
 from vocode.streaming.telephony.client.base_telephony_client import BaseTelephonyClient
 from vocode.streaming.telephony.templater import Templater
+
+_ttl_in_seconds = 60 * 60 * 24
+_redis_client = Redis(
+    host=os.environ.get("REDISHOST", "localhost"),
+    port=int(os.environ.get("REDISPORT", 6379)),
+)
 
 
 class TwilioClient(BaseTelephonyClient):
@@ -47,6 +55,7 @@ class TwilioClient(BaseTelephonyClient):
             status_callback_event=["initiated", "ringing", "answered", "completed"],
             **self.get_telephony_config().extra_params,
         )
+        _redis_client.setex(twilio_call.sid, _ttl_in_seconds, conversation_id)
         return twilio_call.sid
 
     def get_connection_twiml(self, conversation_id: str):

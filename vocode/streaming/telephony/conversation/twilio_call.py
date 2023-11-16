@@ -36,6 +36,13 @@ import datetime
 import json
 
 
+_ttl_in_seconds = 60 * 60 * 24
+_redis_client = Redis(
+    host=os.environ.get("REDISHOST", "localhost"),
+    port=int(os.environ.get("REDISPORT", 6379)),
+)
+
+
 class PhoneCallWebsocketAction(Enum):
     CLOSE_WEBSOCKET = 1
 
@@ -99,13 +106,6 @@ class TwilioCall(Call[TwilioOutputDevice]):
         self.twilio_sid = twilio_sid
         self.latest_media_timestamp = 0
         self.echo_mode = echo_mode
-
-    def _cache_conversation_id(self):
-        _ttl_in_seconds = 60 * 60 * 24
-        _redis_client = Redis(
-            host=os.environ.get("REDISHOST", "localhost"),
-            port=int(os.environ.get("REDISPORT", 6379)),
-        )
         _redis_client.setex(self.twilio_sid, _ttl_in_seconds, self.id)
 
     def create_state_manager(self) -> TwilioCallStateManager:

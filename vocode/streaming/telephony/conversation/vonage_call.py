@@ -86,9 +86,6 @@ class VonageCall(Call[VonageOutputDevice]):
             self.vonage_config.recording_url = (
                 f"{vonage_config.recording_url}/{conversation_id}"
             )
-            self.vonage_config.events_url = (
-                f"{vonage_config.events_url}/{conversation_id}"
-            )
         else:
             self.vonage_config = VonageConfig(
                 api_key=getenv("VONAGE_API_KEY"),

@@ -1224,7 +1224,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         if isinstance(
                             interruptible_event.payload, AgentResponseMessage
                         ):
-                            self.interrupted_turn_uuid = interruptible_event.payload[-1]
+                            self.interrupted_turn_uuid = (
+                                interruptible_event.payload.turn_uuid
+                            )
                         self.logger.debug("Interrupting event")
                         num_interrupts += 1
             except queue.Empty:

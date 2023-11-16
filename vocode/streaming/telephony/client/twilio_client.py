@@ -55,7 +55,9 @@ class TwilioClient(BaseTelephonyClient):
             status_callback_event=["initiated", "ringing", "answered", "completed"],
             **self.get_telephony_config().extra_params,
         )
-        _redis_client.setex(twilio_call.sid, _ttl_in_seconds, conversation_id)
+        _redis_client.setex(
+            f"twilio_sid_{twilio_call.sid}", _ttl_in_seconds, conversation_id
+        )
         return twilio_call.sid
 
     def get_connection_twiml(self, conversation_id: str):

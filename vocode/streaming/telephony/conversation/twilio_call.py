@@ -106,7 +106,7 @@ class TwilioCall(Call[TwilioOutputDevice]):
         self.twilio_sid = twilio_sid
         self.latest_media_timestamp = 0
         self.echo_mode = echo_mode
-        _redis_client.setex(self.twilio_sid, _ttl_in_seconds, self.id)
+        _redis_client.setex(f"twilio_sid_{self.twilio_sid}", _ttl_in_seconds, self.id)
 
     def create_state_manager(self) -> TwilioCallStateManager:
         return TwilioCallStateManager(self)

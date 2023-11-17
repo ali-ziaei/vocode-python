@@ -1,9 +1,12 @@
+import os
 from fastapi import WebSocket
 import base64
 from enum import Enum
 import json
 import logging
 from typing import Optional
+
+from redis import Redis
 from vocode import getenv
 from vocode.streaming.agent.factory import AgentFactory
 from vocode.streaming.models.agent import AgentConfig
@@ -31,6 +34,13 @@ from vocode.streaming.audio.factory import AudioServiceFactory
 from vocode.streaming.models.logging import VocodeBaseLogMessage, VocodeLogContext
 import datetime
 import json
+
+
+_ttl_in_seconds = 60 * 60 * 24
+_redis_client = Redis(
+    host=os.environ.get("REDISHOST", "localhost"),
+    port=int(os.environ.get("REDISPORT", 6379)),
+)
 
 
 class PhoneCallWebsocketAction(Enum):
@@ -96,6 +106,7 @@ class TwilioCall(Call[TwilioOutputDevice]):
         self.twilio_sid = twilio_sid
         self.latest_media_timestamp = 0
         self.echo_mode = echo_mode
+        _redis_client.setex(f"twilio_sid_{self.twilio_sid}", _ttl_in_seconds, self.id)
 
     def create_state_manager(self) -> TwilioCallStateManager:
         return TwilioCallStateManager(self)

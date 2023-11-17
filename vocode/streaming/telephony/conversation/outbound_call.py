@@ -82,7 +82,8 @@ class OutboundCall:
         self.output_to_speaker = output_to_speaker
         self.redis_client = Redis(
             host=os.environ.get("REDISHOST", "localhost"),
-            port=int(os.environ.get("REDISPORT", 6379)))
+            port=int(os.environ.get("REDISPORT", 6379)),
+        )
 
     def create_telephony_client(self) -> BaseTelephonyClient:
         if self.twilio_config is not None:
@@ -144,7 +145,7 @@ class OutboundCall:
             to_phone=self.to_phone,
             from_phone=self.from_phone,
             record=self.telephony_client.get_telephony_config().record,
-            recording_url=(f"{self.telephony_client.get_telephony_config().recording_url}/{self.conversation_id}"),
+            recording_url=f"{self.telephony_client.get_telephony_config().recording_url}/{self.conversation_id}",
             events_url=self.telephony_client.get_telephony_config().events_url,
             digits=self.digits,
         )

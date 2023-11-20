@@ -1,5 +1,7 @@
 from fastapi import WebSocket, WebSocketDisconnect
 import logging
+import os
+from redis import Redis
 from typing import Optional
 
 from vocode import getenv
@@ -32,6 +34,13 @@ from vocode.streaming.utils.state_manager import (
 )
 from vocode.streaming.models.audio import AudioServiceConfig
 from vocode.streaming.audio.factory import AudioServiceFactory
+
+
+_ttl_in_seconds = 60 * 60 * 24
+_redis_client = Redis(
+    host=os.environ.get("REDISHOST", "localhost"),
+    port=int(os.environ.get("REDISPORT", 6379)),
+)
 
 
 class VonageCall(Call[VonageOutputDevice]):
@@ -101,6 +110,7 @@ class VonageCall(Call[VonageOutputDevice]):
             self.output_speaker = SpeakerOutput.from_default_device(
                 sampling_rate=VONAGE_SAMPLING_RATE, blocksize=VONAGE_CHUNK_SIZE // 2
             )
+        _redis_client.setex(f"vonage_uuid_{vonage_uuid}", _ttl_in_seconds, self.id)
 
     def create_state_manager(self) -> VonageCallStateManager:
         return VonageCallStateManager(self)

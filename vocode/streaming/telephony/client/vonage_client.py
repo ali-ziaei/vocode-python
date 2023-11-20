@@ -1,10 +1,19 @@
+import os
 from typing import Any, Dict, List, Optional
 import aiohttp
+from redis import Redis
 from vocode.streaming.models.telephony import VonageConfig
 from vocode.streaming.telephony.client.base_telephony_client import BaseTelephonyClient
 import vonage
 
 from vocode.streaming.telephony.constants import VONAGE_CONTENT_TYPE
+
+
+_ttl_in_seconds = 60 * 60 * 24
+_redis_client = Redis(
+    host=os.environ.get("REDISHOST", "localhost"),
+    port=int(os.environ.get("REDISPORT", 6379)),
+)
 
 
 class VonageClient(BaseTelephonyClient):
@@ -74,7 +83,7 @@ class VonageClient(BaseTelephonyClient):
         events_url: Optional[str] = None,
         digits: Optional[str] = None,
     ) -> str:  # identifier of the call on the telephony provider
-        return await self.create_vonage_call(
+        vonage_call_uuid = await self.create_vonage_call(
             to_phone,
             from_phone,
             self.create_call_ncco(
@@ -83,6 +92,10 @@ class VonageClient(BaseTelephonyClient):
             digits,
             event_urls=[events_url],
         )
+        _redis_client.setex(
+            f"vonage_uuid_{vonage_call_uuid}", _ttl_in_seconds, conversation_id
+        )
+        return vonage_call_uuid
 
     @staticmethod
     def create_call_ncco(

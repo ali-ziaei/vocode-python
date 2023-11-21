@@ -572,7 +572,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.logger.debug(log_message, context=context)
                     self.conversation.audio_service.mute()
                     self.conversation.transcriber.mute()
-                    agent_response_message.is_interruptible = False
 
                 if self.conversation.filler_audio_worker is not None:
                     if (
@@ -599,9 +598,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         synthesis_result,
                         agent_response_message.hangs_up,
                     ),
-                    is_interruptible=item.is_interruptible
-                    if not agent_response_message.hangs_up
-                    else False,
+                    is_interruptible=item.is_interruptible,
                     agent_response_tracker=item.agent_response_tracker,
                 )
                 self.conversation.num_retry_ask_more_time_in_row = 0

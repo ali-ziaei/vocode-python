@@ -563,6 +563,17 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     AgentResponseMessage, agent_response
                 )
 
+                if agent_response_message.hangs_up:
+                    context = VocodeLogContext(self.conversation.id)
+                    log_message = VocodeBaseLogMessage(
+                        message="NLU: Hangs up triggered, muting microphones and make response non interruptible",
+                        text=agent_response_message.message.text,
+                    )
+                    self.conversation.logger.debug(log_message, context=context)
+                    self.conversation.audio_service.mute()
+                    self.conversation.transcriber.mute()
+                    agent_response_message.is_interruptible = False
+
                 if self.conversation.filler_audio_worker is not None:
                     if (
                         self.conversation.filler_audio_worker.interrupt_current_filler_audio()
@@ -588,7 +599,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         synthesis_result,
                         agent_response_message.hangs_up,
                     ),
-                    is_interruptible=item.is_interruptible,
+                    is_interruptible=item.is_interruptible
+                    if not agent_response_message.hangs_up
+                    else False,
                     agent_response_tracker=item.agent_response_tracker,
                 )
                 self.conversation.num_retry_ask_more_time_in_row = 0

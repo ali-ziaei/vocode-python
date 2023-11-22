@@ -563,6 +563,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     AgentResponseMessage, agent_response
                 )
 
+                if agent_response_message.hangs_up:
+                    context = VocodeLogContext(self.conversation.id)
+                    log_message = VocodeBaseLogMessage(
+                        message="NLU: Hangs up triggered, muting microphones and make response non interruptible",
+                        text=agent_response_message.message.text,
+                    )
+                    self.conversation.logger.debug(log_message, context=context)
+                    self.conversation.audio_service.mute()
+                    self.conversation.transcriber.mute()
+
                 if self.conversation.filler_audio_worker is not None:
                     if (
                         self.conversation.filler_audio_worker.interrupt_current_filler_audio()

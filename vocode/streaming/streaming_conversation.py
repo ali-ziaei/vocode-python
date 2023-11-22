@@ -585,6 +585,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=agent_response_message.message.text,
                 )
                 self.conversation.logger.debug(log_message, context=context)
+
+                self.conversation.spoken_metadata.ready_to_publish_filler = False
                 synthesis_result = await self.conversation.synthesizer.create_speech(
                     agent_response_message.message,
                     self.chunk_size,

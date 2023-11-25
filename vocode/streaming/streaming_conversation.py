@@ -273,7 +273,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
             transcription_in_queue = await self._flush_asr_queue()
             if transcription_in_queue:
-                self.final_transcription += " " + transcription_in_queue
+                self.final_transcription += " " + transcription_in_queue.message
                 self.final_transcription = " ".join(self.final_transcription.split())
                 conversation_data = await self.conversation.events_manager.chat_service.get_conversation_data(
                     self.conversation.id
@@ -289,7 +289,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 ):
                     event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                         TranscriptionAgentInput(
-                            transcription=transcription_in_queue,
+                            transcription=Transcription(
+                                message=self.final_transcription,
+                                is_final=True,
+                                confidence=1.0,
+                                is_interrupt=False,
+                                latency=0.0,
+                            ),
                             conversation_id=self.conversation.id,
                             vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
                             twilio_sid=getattr(self.conversation, "twilio_sid", None),

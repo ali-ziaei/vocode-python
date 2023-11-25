@@ -103,6 +103,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.input_queue = input_queue
             self.output_queue = output_queue
             self.conversation = conversation
+            self.final_transcription = None
 
         async def publish_ask_more_time_filler(self):
             # when agent or customer are speaking, we return
@@ -243,24 +244,24 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 self.conversation.transcriber.unmute()
 
         async def _flush_asr_queue(self):
-            transcription_should_be_sent_to_llm: Optional[Transcription] = None
+            transcription_in_queue: Optional[Transcription] = None
             while True:
                 try:
                     item = (
                         self.conversation.transcriptions_postprocessing_worker.output_queue.get_nowait()
                     )
 
-                    if transcription_should_be_sent_to_llm is None:
-                        transcription_should_be_sent_to_llm = item.payload.transcription
+                    if transcription_in_queue is None:
+                        transcription_in_queue = item.payload.transcription
                     else:
-                        transcription_should_be_sent_to_llm.message = (
-                            transcription_should_be_sent_to_llm.message
+                        transcription_in_queue.message = (
+                            transcription_in_queue.message
                             + " "
                             + item.payload.transcription.message
                         )
                 except asyncio.queues.QueueEmpty:
                     break
-            return transcription_should_be_sent_to_llm
+            return transcription_in_queue
 
         async def publish_asr_result(self):
             if not self.conversation.transcriptions_worker.is_speaking_at:
@@ -270,12 +271,25 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 time.time() - self.conversation.transcriptions_worker.is_speaking_at
             )
 
-            if wait_time >= self.conversation.asr_post_process_endpoint_sec:
-                transcription_should_be_sent_to_llm = await self._flush_asr_queue()
-                if transcription_should_be_sent_to_llm:
+            transcription_in_queue = await self._flush_asr_queue()
+            if transcription_in_queue:
+                self.final_transcription += " " + transcription_in_queue
+                self.final_transcription = " ".join(self.final_transcription.split())
+                conversation_data = await self.conversation.events_manager.chat_service.get_conversation_data(
+                    self.conversation.id
+                )
+                if (
+                    wait_time >= self.conversation.asr_post_process_endpoint_sec
+                    or await self.conversation.agent.get_endpoint_prediction(
+                        self,
+                        conversation_data.chat,
+                        self.final_transcription,
+                        self.conversation.id,
+                    )
+                ):
                     event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                         TranscriptionAgentInput(
-                            transcription=transcription_should_be_sent_to_llm,
+                            transcription=transcription_in_queue,
                             conversation_id=self.conversation.id,
                             vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
                             twilio_sid=getattr(self.conversation, "twilio_sid", None),
@@ -287,9 +301,10 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     context = VocodeLogContext(self.conversation.id)
                     log_message = VocodeBaseLogMessage(
                         message=f'ASR: transcription_should_be_sent_to_llm with dynamic endpoint "{self.conversation.asr_post_process_endpoint_sec}"',
-                        text=f'Transcription: "{transcription_should_be_sent_to_llm.message}", Latency: "{transcription_should_be_sent_to_llm.latency}" seconds, and asr post processing endpointing: "{self.conversation.asr_post_process_endpoint_sec}" seconds.',
+                        text=f'Transcription: "{transcription_in_queue.message}", Latency: "{transcription_in_queue.latency}" seconds, and asr post processing endpointing: "{self.conversation.asr_post_process_endpoint_sec}" seconds.',
                     )
                     self.conversation.logger.debug(log_message, context=context)
+                    self.final_transcription = ""
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -814,6 +829,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
         self.agent = agent
         self.asr_post_process_endpoint_sec = 0.0
         self.number_of_times_agent_interrupted_customer = -1
+        self.chat_to_endpoint = {}
 
         # initiate filler pause tracking
         self.spoken_metadata = SpokenMetaData()

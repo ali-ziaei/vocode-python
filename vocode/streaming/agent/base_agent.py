@@ -136,7 +136,7 @@ class AbstractAgent(Generic[AgentConfigType]):
         assert len(on_cut_off_messages) > 0
         return random.choice(on_cut_off_messages).text
 
-    async def get_endpoint_prediction(self, chat, context):
+    async def get_endpoint_prediction(self, chat, human_input, conversation_id: str):
         pass
 
 

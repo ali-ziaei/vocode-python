@@ -103,7 +103,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.input_queue = input_queue
             self.output_queue = output_queue
             self.conversation = conversation
-            self.final_transcription = None
+            self.final_transcription = ""
 
         async def publish_ask_more_time_filler(self):
             # when agent or customer are speaking, we return

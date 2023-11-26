@@ -278,15 +278,25 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 conversation_data = await self.conversation.events_manager.chat_service.get_conversation_data(
                     self.conversation.id
                 )
-                if (
-                    wait_time >= self.conversation.asr_post_process_endpoint_sec
-                    or await self.conversation.agent.get_endpoint_prediction(
-                        self,
-                        conversation_data.chat,
-                        self.final_transcription,
-                        self.conversation.id,
-                    )
-                ):
+
+                condition_1 = (
+                    self.conversation.asr_post_process_endpoint_sec is not None
+                    and wait_time >= self.conversation.asr_post_process_endpoint_sec
+                )
+                condition_2 = await self.conversation.agent.get_endpoint_prediction(
+                    self,
+                    conversation_data.chat,
+                    self.final_transcription,
+                    self.conversation.id,
+                )
+                condition_3 = (
+                    self.conversation.transcriber.get_transcriber_config().endpoint_timeout
+                    is not None
+                    and wait_time
+                    >= self.conversation.transcriber.get_transcriber_config().endpoint_timeout
+                )
+
+                if condition_1 or condition_2 or condition_3:
                     event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                         TranscriptionAgentInput(
                             transcription=Transcription(

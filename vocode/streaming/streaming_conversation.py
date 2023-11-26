@@ -284,7 +284,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     and wait_time >= self.conversation.asr_post_process_endpoint_sec
                 )
                 condition_2 = await self.conversation.agent.get_endpoint_prediction(
-                    self,
                     conversation_data.chat,
                     self.final_transcription,
                     self.conversation.id,

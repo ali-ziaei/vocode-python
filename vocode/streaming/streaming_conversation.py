@@ -273,6 +273,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
             transcription_in_queue = await self._flush_asr_queue()
             if transcription_in_queue:
+                self.final_transcription = self.final_transcription.strip(".")
                 self.final_transcription += " " + transcription_in_queue.message
                 self.final_transcription = " ".join(self.final_transcription.split())
                 conversation_data = await self.conversation.events_manager.chat_service.get_conversation_data(
@@ -280,7 +281,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 )
 
                 condition_1 = (
-                    self.conversation.asr_post_process_endpoint_sec is not None
+                    self.conversation.asr_post_process_endpoint_sec > 0
                     and wait_time >= self.conversation.asr_post_process_endpoint_sec
                 )
                 condition_2 = await self.conversation.agent.get_endpoint_prediction(

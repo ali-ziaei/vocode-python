@@ -305,7 +305,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 # if we pass endpoint time out, we send out final_transcription
                 if wait_time >= self.conversation.agent_endpoint_config.time_out:
                     await self._send_transcript_event(context)
-                    return
 
                 if transcription_in_queue is not None:
                     log_message = VocodeBaseLogMessage(

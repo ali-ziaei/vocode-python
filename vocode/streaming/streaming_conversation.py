@@ -262,7 +262,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     break
             return transcription_in_queue
 
-        async def send_transcript_event(self, context):
+        async def _send_transcript_event(self, context):
+            if (
+                self.conversation.transcriptions_postprocessing_worker.final_transcription
+                is None
+            ):
+                return
+
             event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
                 TranscriptionAgentInput(
                     transcription=self.conversation.transcriptions_postprocessing_worker.final_transcription,
@@ -275,7 +281,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
             await self.conversation.agent.get_input_queue().put(event)
 
             log_message = VocodeBaseLogMessage(
-                message="ASR: transcription_should_be_sent_to_llm",
+                message="ASR: final transcription sent to llm.",
                 text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}"',
             )
             self.conversation.logger.debug(log_message, context=context)
@@ -287,33 +293,23 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if not self.conversation.transcriptions_worker.is_speaking_at:
                 return
 
-            context = VocodeLogContext(self.conversation.id)
-
             wait_time = (
                 time.time() - self.conversation.transcriptions_worker.is_speaking_at
             )
 
+            context = VocodeLogContext(self.conversation.id)
             # first manual endpoint point before we send to end point model
             if wait_time >= self.conversation.asr_post_process_endpoint_sec:
                 transcription_in_queue = await self._flush_asr_queue()
 
-                # if we pass endpoint time out, we send out final_transcription if exists
+                # if we pass endpoint time out, we send out final_transcription
                 if wait_time >= self.conversation.agent_endpoint_config.time_out:
-                    if (
-                        self.conversation.transcriptions_postprocessing_worker.final_transcription
-                        is not None
-                    ):
-                        log_message = VocodeBaseLogMessage(
-                            message=f'Endpointing: We hit time out for endpointing, wait time: "{wait_time}" >= time_out: "{self.conversation.agent_endpoint_config.time_out}"',
-                            text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription}"',
-                        )
-                        self.conversation.logger.debug(log_message, context=context)
-                        await self.send_transcript_event(context)
+                    await self._send_transcript_event(context)
                     return
 
                 if transcription_in_queue is not None:
                     log_message = VocodeBaseLogMessage(
-                        message=f'Endpointing: asr post processing timed out with "{self.conversation.asr_post_process_endpoint_sec}" as post processing time out, ready to send to model based endpoint ...',
+                        message=f'Endpointing: asr post processing timed out with "{self.conversation.asr_post_process_endpoint_sec}", ready to send to model based endpoint ...',
                         text=f'Transcription: "{transcription_in_queue.message}"',
                     )
                     self.conversation.logger.debug(log_message, context=context)
@@ -334,12 +330,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             + transcription_in_queue.message
                         )
 
-                    if (
-                        self.conversation.transcriptions_postprocessing_worker.final_transcription
-                        is None
-                    ):
-                        return
-
                     # model based endpoint pointing
                     is_endpoint = await self.conversation.agent.get_endpoint_prediction(
                         self.conversation.transcriptions_postprocessing_worker.final_transcription.message,
@@ -353,7 +343,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.logger.debug(log_message, context=context)
 
                     if is_endpoint:
-                        await self.send_transcript_event(context)
+                        await self._send_transcript_event(context)
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)

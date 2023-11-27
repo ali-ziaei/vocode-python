@@ -297,11 +297,17 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if wait_time >= self.conversation.asr_post_process_endpoint_sec:
                 transcription_in_queue = await self._flush_asr_queue()
 
+                # if we pass endpoint time out, we send out final_transcription if exists
                 if wait_time >= self.conversation.agent_endpoint_config.time_out:
                     if (
                         self.conversation.transcriptions_postprocessing_worker.final_transcription
                         is not None
                     ):
+                        log_message = VocodeBaseLogMessage(
+                            message=f'Endpointing: We hit time out for endpointing, wait time: "{wait_time}" >= time_out: "{self.conversation.agent_endpoint_config.time_out}"',
+                            text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription}"',
+                        )
+                        self.conversation.logger.debug(log_message, context=context)
                         await self.send_transcript_event(context)
                     return
 

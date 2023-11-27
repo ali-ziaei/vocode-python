@@ -298,6 +298,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             + transcription_in_queue.message
                         )
 
+                    if (
+                        self.conversation.transcriptions_postprocessing_worker.final_transcription
+                        is None
+                    ):
+                        return
+
                     # model based endpoint pointing
                     is_endpoint = await self.conversation.agent.get_endpoint_prediction(
                         self.conversation.transcriptions_postprocessing_worker.final_transcription.message,

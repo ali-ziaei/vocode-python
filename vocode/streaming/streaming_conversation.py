@@ -262,6 +262,27 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     break
             return transcription_in_queue
 
+        async def send_transcript_event(self, context):
+            event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
+                TranscriptionAgentInput(
+                    transcription=self.conversation.transcriptions_postprocessing_worker.final_transcription,
+                    conversation_id=self.conversation.id,
+                    vonage_uuid=getattr(self.conversation, "vonage_uuid", None),
+                    twilio_sid=getattr(self.conversation, "twilio_sid", None),
+                ),
+                is_interruptible=False,
+            )
+            await self.conversation.agent.get_input_queue().put(event)
+
+            log_message = VocodeBaseLogMessage(
+                message="ASR: transcription_should_be_sent_to_llm",
+                text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}"',
+            )
+            self.conversation.logger.debug(log_message, context=context)
+            self.conversation.transcriptions_postprocessing_worker.final_transcription = (
+                None
+            )
+
         async def publish_asr_result(self):
             if not self.conversation.transcriptions_worker.is_speaking_at:
                 return
@@ -275,7 +296,16 @@ class StreamingConversation(Generic[OutputDeviceType]):
             # first manual endpoint point before we send to end point model
             if wait_time >= self.conversation.asr_post_process_endpoint_sec:
                 transcription_in_queue = await self._flush_asr_queue()
-                if transcription_in_queue:
+
+                if wait_time >= self.conversation.agent_endpoint_config.time_out:
+                    if (
+                        self.conversation.transcriptions_postprocessing_worker.final_transcription
+                        is not None
+                    ):
+                        await self.send_transcript_event(context)
+                    return
+
+                if transcription_in_queue is not None:
                     log_message = VocodeBaseLogMessage(
                         message=f'Endpointing: asr post processing timed out with "{self.conversation.asr_post_process_endpoint_sec}" as post processing time out, ready to send to model based endpoint ...',
                         text=f'Transcription: "{transcription_in_queue.message}"',
@@ -316,33 +346,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     )
                     self.conversation.logger.debug(log_message, context=context)
 
-                    if (
-                        is_endpoint
-                        or wait_time >= self.conversation.agent_endpoint_config.time_out
-                    ):
-                        event = self.conversation.transcriptions_postprocessing_worker.interruptible_event_factory.create_interruptible_event(
-                            TranscriptionAgentInput(
-                                transcription=self.conversation.transcriptions_postprocessing_worker.final_transcription,
-                                conversation_id=self.conversation.id,
-                                vonage_uuid=getattr(
-                                    self.conversation, "vonage_uuid", None
-                                ),
-                                twilio_sid=getattr(
-                                    self.conversation, "twilio_sid", None
-                                ),
-                            ),
-                            is_interruptible=False,
-                        )
-                        await self.conversation.agent.get_input_queue().put(event)
-
-                        log_message = VocodeBaseLogMessage(
-                            message="ASR: transcription_should_be_sent_to_llm",
-                            text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}"',
-                        )
-                        self.conversation.logger.debug(log_message, context=context)
-                        self.conversation.transcriptions_postprocessing_worker.final_transcription = (
-                            None
-                        )
+                    if is_endpoint:
+                        await self.send_transcript_event(context)
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)

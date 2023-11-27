@@ -334,15 +334,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             is_interruptible=False,
                         )
                         await self.conversation.agent.get_input_queue().put(event)
-                        self.conversation.transcriptions_postprocessing_worker.final_transcription = (
-                            None
-                        )
 
                         log_message = VocodeBaseLogMessage(
                             message="ASR: transcription_should_be_sent_to_llm",
                             text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}"',
                         )
                         self.conversation.logger.debug(log_message, context=context)
+                        self.conversation.transcriptions_postprocessing_worker.final_transcription = (
+                            None
+                        )
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)

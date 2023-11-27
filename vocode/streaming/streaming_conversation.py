@@ -266,6 +266,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if not self.conversation.transcriptions_worker.is_speaking_at:
                 return
 
+            context = VocodeLogContext(self.conversation.id)
+
             wait_time = (
                 time.time() - self.conversation.transcriptions_worker.is_speaking_at
             )
@@ -274,6 +276,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
             if wait_time >= self.conversation.asr_post_process_endpoint_sec:
                 transcription_in_queue = await self._flush_asr_queue()
                 if transcription_in_queue:
+                    log_message = VocodeBaseLogMessage(
+                        message=f'Endpointing: asr post processing timed out with "{self.conversation.asr_post_process_endpoint_sec}" as post processing time out, ready to send to model based endpoint ...',
+                        text=f'Transcription: "{transcription_in_queue.message}"',
+                    )
+                    self.conversation.logger.debug(log_message, context=context)
+
                     if (
                         self.conversation.transcriptions_postprocessing_worker.final_transcription
                         is None
@@ -295,6 +303,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         self.conversation.transcriptions_postprocessing_worker.final_transcription.message,
                         self.conversation.id,
                     )
+
+                    log_message = VocodeBaseLogMessage(
+                        message="Endpointing: applied end point model ...",
+                        text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}", Endpoint: "{is_endpoint}"',
+                    )
+                    self.conversation.logger.debug(log_message, context=context)
 
                     if (
                         is_endpoint
@@ -318,12 +332,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             None
                         )
 
-                    context = VocodeLogContext(self.conversation.id)
-                    log_message = VocodeBaseLogMessage(
-                        message=f'ASR: transcription_should_be_sent_to_llm with dynamic endpoint "{self.conversation.asr_post_process_endpoint_sec}"',
-                        text=f'Transcription: "{transcription_in_queue.message}", Latency: "{transcription_in_queue.latency}" seconds, and asr post processing endpointing: "{self.conversation.asr_post_process_endpoint_sec}" seconds.',
-                    )
-                    self.conversation.logger.debug(log_message, context=context)
+                        log_message = VocodeBaseLogMessage(
+                            message="ASR: transcription_should_be_sent_to_llm",
+                            text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}"',
+                        )
+                        self.conversation.logger.debug(log_message, context=context)
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)

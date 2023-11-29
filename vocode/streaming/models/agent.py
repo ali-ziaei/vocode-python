@@ -90,6 +90,11 @@ class AgentInterruptCustomer(DataClassDictMixin):
 
 
 @dataclass
+class AgentEndpointConfig(DataClassDictMixin):
+    time_out: Optional[float] = None
+
+
+@dataclass
 class AgentFillerConfig(DataClassDictMixin):
     ask_more_time: Optional[AgentAskMoreTimeFillerConfig] = None
     speak_up: Optional[AgentSpeakUpFillerConfig] = None
@@ -107,6 +112,7 @@ class AgentConfig(TypedModel, type=AgentType.BASE.value):
     track_bot_sentiment: bool = False
     actions: Optional[List[ActionConfig]] = None
     agent_filler_config: Optional[AgentFillerConfig] = None
+    agent_endpoint_config: Optional[AgentEndpointConfig] = None
 
 
 class CutOffResponse(BaseModel):

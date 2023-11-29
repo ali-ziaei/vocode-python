@@ -136,6 +136,13 @@ class AbstractAgent(Generic[AgentConfigType]):
         assert len(on_cut_off_messages) > 0
         return random.choice(on_cut_off_messages).text
 
+    async def get_endpoint_prediction(
+        self,
+        human_input: str,
+        conversation_id: str,
+    ) -> bool:
+        pass
+
 
 class BaseAgent(AbstractAgent[AgentConfigType], InterruptibleWorker):
     def __init__(

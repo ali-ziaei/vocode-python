@@ -83,6 +83,7 @@ class VonageClient(BaseTelephonyClient):
         events_url: Optional[str] = None,
         digits: Optional[str] = None,
     ) -> str:  # identifier of the call on the telephony provider
+        extra_params = self.get_telephony_config().extra_params or {}
         vonage_call_uuid = await self.create_vonage_call(
             to_phone,
             from_phone,
@@ -91,6 +92,7 @@ class VonageClient(BaseTelephonyClient):
             ),
             digits,
             event_urls=[events_url],
+            **extra_params,
         )
         _redis_client.setex(
             f"vonage_uuid_{vonage_call_uuid}", _ttl_in_seconds, conversation_id

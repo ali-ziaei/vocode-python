@@ -29,7 +29,7 @@ class TwilioConfig(BaseModel):
     record: bool = False
     recording_url: Optional[str] = None
     events_url: Optional[str] = None
-    extra_params: Optional[Dict[str, Any]] = {}
+    extra_params: Optional[Dict[str, Any]] = None
 
 
 class VonageConfig(BaseModel):
@@ -40,6 +40,7 @@ class VonageConfig(BaseModel):
     record: bool = False
     recording_url: Optional[str] = None
     events_url: Optional[str] = None
+    extra_params: Optional[Dict[str, Any]] = None
 
 
 class CallEntity(BaseModel):

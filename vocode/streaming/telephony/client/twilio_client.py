@@ -44,6 +44,7 @@ class TwilioClient(BaseTelephonyClient):
     ) -> str:
         # TODO: Make this async. This is blocking.
         twiml = self.get_connection_twiml(conversation_id=conversation_id)
+        extra_params = self.get_telephony_config().extra_params or {}
         twilio_call = self.twilio_client.calls.create(
             twiml=twiml.body.decode("utf-8"),
             to=to_phone,
@@ -53,7 +54,7 @@ class TwilioClient(BaseTelephonyClient):
             recording_status_callback=recording_url,
             status_callback=events_url,
             status_callback_event=["initiated", "ringing", "answered", "completed"],
-            **self.get_telephony_config().extra_params,
+            **extra_params,
         )
         _redis_client.setex(
             f"twilio_sid_{twilio_call.sid}", _ttl_in_seconds, conversation_id

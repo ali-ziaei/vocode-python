@@ -8,7 +8,7 @@ class RedisRenewableTTLCache:
         host=os.environ.get("REDISHOST", "localhost"),
         port=int(os.environ.get("REDISPORT", 6379)))
     _lru_cache = LRUCache(maxsize=2048)
-    _ttl_in_seconds = 60 * 60 * 24
+    _ttl_in_seconds = int(os.environ.get("REDIS_TTL_IN_SECONDS", 60 * 60 * 24))
 
     def get(self, key):
         if key in self._lru_cache:

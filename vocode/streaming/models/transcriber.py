@@ -104,6 +104,7 @@ class TranscriberConfig(TypedModel, type=TranscriberType.BASE.value):
 
 
 class DeepgramTranscriberConfig(TranscriberConfig, type=TranscriberType.DEEPGRAM.value):
+    speech_key: Optional[str] = None
     language: Optional[str] = None
     model: Optional[str] = "nova-2-ea"
     tier: Optional[str] = None

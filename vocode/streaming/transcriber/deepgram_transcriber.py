@@ -118,6 +118,14 @@ class DeepgramTranscriber(BaseAsyncTranscriber[DeepgramTranscriberConfig]):
             extra_params["version"] = self.transcriber_config.version
         if self.transcriber_config.keywords:
             extra_params["keywords"] = self.transcriber_config.keywords
+        if self.transcriber_config.dictation:
+            extra_params["dictation"] = self.transcriber_config.dictation
+        if self.transcriber_config.measurements:
+            extra_params["measurements"] = self.transcriber_config.measurements
+        if self.transcriber_config.measurements:
+            extra_params["diarize"] = self.transcriber_config.diarize
+        if self.transcriber_config.filler_words:
+            extra_params["filler_words"] = self.transcriber_config.filler_words
         if self.transcriber_config.smart_format:
             extra_params["smart_format"] = "true"
         else:

@@ -111,7 +111,6 @@ class DeepgramTranscriberConfig(TranscriberConfig, type=TranscriberType.DEEPGRAM
     version: Optional[str] = None
     keywords: Optional[list] = None
     smart_format: Optional[bool] = None
-    dictation: Optional[bool] = None
     diarize: Optional[bool] = None
     filler_words: Optional[bool] = None
 

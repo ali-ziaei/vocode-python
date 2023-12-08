@@ -140,7 +140,7 @@ class AbstractAgent(Generic[AgentConfigType]):
         self,
         human_input: str,
         conversation_id: str,
-    ) -> bool:
+    ) -> float:
         pass
 
 

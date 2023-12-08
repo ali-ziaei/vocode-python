@@ -1191,13 +1191,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.output_device.consume_nonblocking(chunk_result.chunk)
             end_time = time.time()
 
-            context = VocodeLogContext(self.id)
-            log_message = VocodeBaseLogMessage(
-                message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{speech_length_seconds}" to output device.',
-                text=message_sent,
-            )
-            self.logger.debug(log_message, context=context)
-
             @sentry_probe("TTS speaking", data={"message": message})
             async def _tts_speaking():
                 await asyncio.sleep(

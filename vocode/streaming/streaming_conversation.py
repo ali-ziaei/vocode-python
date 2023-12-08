@@ -342,15 +342,15 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         self.conversation.transcriptions_postprocessing_worker.final_transcription.message,
                         self.conversation.id,
                     )
-
-                    log_message = VocodeBaseLogMessage(
-                        message="Endpointing: applied end point model ...",
-                        text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}", Endpoint: "{endpoint_prob}"',
-                    )
-                    self.conversation.logger.debug(log_message, context=context)
                     self.conversation.scaled_ep_wait_time = self._scale_ep_wait_time(
                         endpoint_prob
                     )
+
+                    log_message = VocodeBaseLogMessage(
+                        message="Endpointing: applied end point model ...",
+                        text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}", Endpoint probability: "{endpoint_prob}", "New timeout: "{self.conversation.scaled_ep_wait_time}"',
+                    )
+                    self.conversation.logger.debug(log_message, context=context)
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)

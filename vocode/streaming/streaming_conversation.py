@@ -8,6 +8,7 @@ import logging
 import queue
 import random
 import threading
+import numpy as np
 import time
 import typing
 from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, cast
@@ -289,6 +290,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 None
             )
 
+        async def _scale_ep_wait_time(self, endpoint_prob):
+            return (
+                2
+                * (1 - (1 / (1 + np.exp(-10 * endpoint_prob))))
+                * self.conversation.agent_endpoint_config.time_out
+            )
+
         async def publish_asr_result(self):
             if not self.conversation.transcriptions_worker.is_speaking_at:
                 return
@@ -303,7 +311,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 transcription_in_queue = await self._flush_asr_queue()
 
                 # if we pass endpoint time out, we send out final_transcription
-                if wait_time >= self.conversation.agent_endpoint_config.time_out:
+                if wait_time >= self.conversation.scaled_ep_wait_time:
                     await self._send_transcript_event(context)
 
                 if transcription_in_queue is not None:
@@ -330,19 +338,19 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         )
 
                     # model based endpoint pointing
-                    is_endpoint = await self.conversation.agent.get_endpoint_prediction(
+                    endpoint_prob = await self.conversation.agent.get_endpoint_prediction(
                         self.conversation.transcriptions_postprocessing_worker.final_transcription.message,
                         self.conversation.id,
                     )
 
                     log_message = VocodeBaseLogMessage(
                         message="Endpointing: applied end point model ...",
-                        text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}", Endpoint: "{is_endpoint}"',
+                        text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}", Endpoint: "{endpoint_prob}"',
                     )
                     self.conversation.logger.debug(log_message, context=context)
-
-                    if is_endpoint:
-                        await self._send_transcript_event(context)
+                    self.conversation.scaled_ep_wait_time = self._scale_ep_wait_time(
+                        endpoint_prob
+                    )
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -874,6 +882,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         self.agent_filler_config = self.agent.get_agent_config().agent_filler_config
         self.agent_endpoint_config = self.agent.get_agent_config().agent_endpoint_config
+        self.scaled_ep_wait_time = self.agent_endpoint_config.time_out
 
         self.num_retry_ask_more_time_in_row = 0
         self.num_retry_speak_up_in_row = 0

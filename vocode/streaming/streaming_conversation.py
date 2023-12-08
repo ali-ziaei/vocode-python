@@ -342,8 +342,8 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         self.conversation.transcriptions_postprocessing_worker.final_transcription.message,
                         self.conversation.id,
                     )
-                    self.conversation.scaled_ep_wait_time = self._scale_ep_wait_time(
-                        endpoint_prob
+                    self.conversation.scaled_ep_wait_time = (
+                        await self._scale_ep_wait_time(endpoint_prob)
                     )
 
                     log_message = VocodeBaseLogMessage(

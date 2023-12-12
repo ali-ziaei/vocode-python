@@ -24,6 +24,7 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
     PromptTemplate,
 )
+from langchain.prompts.base import DEFAULT_FORMATTER_MAPPING
 
 ALPACA_TEMPLATE_WITH_HISTORY = """### Instruction:
 Your previous conversation history:
@@ -43,7 +44,7 @@ class FormatHistoryPromptTemplate(PromptTemplate):
     def format(self, **kwargs: Any) -> str:
         kwargs = self._merge_partial_and_user_variables(**kwargs)
         kwargs["history"] = get_buffer_string(kwargs["history"])
-        return ""
+        return DEFAULT_FORMATTER_MAPPING[self.template_format](self.template, **kwargs)
 
 
 class CustomStreamingCallbackHandler(BaseCallbackHandler):

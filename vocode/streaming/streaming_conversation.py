@@ -8,11 +8,11 @@ import logging
 import queue
 import random
 import threading
-import numpy as np
 import time
 import typing
 from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, cast
 
+import numpy as np
 from vocode.streaming.action.worker import ActionsWorker
 from vocode.streaming.agent.base_agent import (
     AgentInput,
@@ -129,6 +129,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 and current_time
                 - self.conversation.spoken_metadata.customer_last_spoken_end_time
                 > self.conversation.agent_filler_config.ask_more_time.threshold_sec
+                + self.conversation.scaled_ep_wait_time
             ):
                 filler_phrase = random.choice(
                     self.conversation.agent_filler_config.ask_more_time.filler_phrases

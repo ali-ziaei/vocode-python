@@ -843,7 +843,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
                 await self.conversation.agent.update_last_bot_message_on_cut_off(
                     message_sent,
-                    last_message,
+                    last_message.text,
                     summary_dict,
                     conversation_id=self.conversation.id,
                 )

@@ -97,6 +97,7 @@ class AgentResponse(TypedModel, type=AgentResponseType.BASE.value):
 class AgentResponseMessage(AgentResponse, type=AgentResponseType.MESSAGE.value):
     message: BaseMessage
     last_message: Optional[BaseMessage] = None
+    summary_dict: dict = {}
     is_interruptible: bool = True
     hangs_up: bool = False
 
@@ -122,7 +123,11 @@ class AbstractAgent(Generic[AgentConfigType]):
         return self.agent_config
 
     async def update_last_bot_message_on_cut_off(
-        self, message: str, conversation_id: str
+        self,
+        message_sent: str,
+        last_message: str,
+        summary_dict: dict,
+        conversation_id: str,
     ):
         """Updates the last bot message in the conversation history when the human cuts off the bot's response."""
         pass
@@ -229,7 +234,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         )
         is_first_response = True
         function_call = None
-        async for response, last_content, is_interruptible, hangs_up in responses:
+        async for response, last_content, summary_dict, is_interruptible, hangs_up in responses:
             if isinstance(response, FunctionCall):
                 function_call = response
                 continue
@@ -240,6 +245,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
                 AgentResponseMessage(
                     message=BaseMessage(text=response),
                     last_message=BaseMessage(text=last_content),
+                    summary_dict=summary_dict,
                     hangs_up=hangs_up,
                 ),
                 is_interruptible=self.agent_config.allow_agent_to_be_cut_off
@@ -458,6 +464,7 @@ class RespondAgent(BaseAgent[AgentConfigType]):
         conversation_id: str,
         is_interrupt: bool = False,
     ) -> AsyncGenerator[
-        Tuple[Union[str, FunctionCall], Union[str, FunctionCall], bool], None
+        Tuple[Union[str, FunctionCall], Union[str, FunctionCall], dict, bool, bool],
+        None,
     ]:  # tuple of the content and whether it is interruptible
         raise NotImplementedError

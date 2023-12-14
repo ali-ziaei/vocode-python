@@ -660,6 +660,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     (
                         agent_response_message.message,
                         agent_response_message.last_message,
+                        agent_response_message.summary_dict,
                         synthesis_result,
                         agent_response_message.hangs_up,
                     ),
@@ -689,7 +690,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, last_message, synthesis_result, hangs_up = item.payload
+                (
+                    message,
+                    last_message,
+                    summary_dict,
+                    synthesis_result,
+                    hangs_up,
+                ) = item.payload
                 if last_message is None:
                     last_message = BaseMessage(text="")
                 # create an empty transcript message and attach it to the transcript
@@ -733,6 +740,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=message_sent,
                 )
                 self.conversation.logger.debug(log_message, context=context)
+
+                message_sent_total = last_message.text + " " + message_sent
+                message_sent_total = " ".join(message_sent_total.split()).strip()
 
                 # terminate call if multiple retry happens
                 if self.conversation.agent_filler_config.ask_more_time:
@@ -784,8 +794,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
-                    message_sent_total = last_message.text + " " + message_sent
-                    message_sent_total = " ".join(message_sent_total.split()).strip()
                     if (
                         len(message_sent_total.split())
                         <= self.conversation.agent_filler_config.agent_interrupt_customer.agent_num_spoken_words_as_interrupt_threshold
@@ -833,9 +841,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 agent_response_event
                             )
 
-                    await self.conversation.agent.update_last_bot_message_on_cut_off(
-                        message_sent_total, conversation_id=self.conversation.id
-                    )
+                await self.conversation.agent.update_last_bot_message_on_cut_off(
+                    message_sent,
+                    last_message,
+                    summary_dict,
+                    conversation_id=self.conversation.id,
+                )
 
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (

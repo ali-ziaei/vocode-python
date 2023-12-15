@@ -841,7 +841,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 agent_response_event
                             )
 
-                await self.conversation.agent.update_last_bot_message_on_cut_off(
+                await self.conversation.agent.update_agent_response(
                     message_sent,
                     last_message.text,
                     summary_dict,

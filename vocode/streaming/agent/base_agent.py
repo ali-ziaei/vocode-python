@@ -135,7 +135,7 @@ class AbstractAgent(Generic[AgentConfigType]):
         summary_dict: dict,
         conversation_id: str,
     ):
-        """Updates the last bot message in the conversation history when the human cuts off the bot's response."""
+        """Updates the agent response."""
         pass
 
     def get_cut_off_response(self) -> str:

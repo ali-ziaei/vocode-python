@@ -721,8 +721,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.synthesizer.get_synthesizer_config().text_to_speech_chunk_size_seconds,
                     transcript_message=transcript_message,
                 )
-                if hangs_up:
-                    await self.conversation.terminate()
                 self.conversation.spoken_metadata.agent_last_spoken_end_time = (
                     time.time()
                 )
@@ -862,6 +860,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             await self.conversation.terminate()
                     except asyncio.TimeoutError:
                         pass
+                if hangs_up:
+                    await self.conversation.terminate()
+
             except asyncio.CancelledError:
                 pass
 

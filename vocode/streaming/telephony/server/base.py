@@ -127,6 +127,7 @@ class TelephonyServer:
                 twilio_sid=twilio_sid,
                 from_phone=twilio_from,
                 to_phone=twilio_to,
+                direction="inbound",
             )
 
             conversation_id = create_conversation_id()
@@ -150,6 +151,7 @@ class TelephonyServer:
                 vonage_uuid=vonage_answer_request.uuid,
                 to_phone=vonage_answer_request.from_,
                 from_phone=vonage_answer_request.to,
+                direction="inbound",
             )
             conversation_id = create_conversation_id()
             await self.config_manager.save_config(conversation_id, call_config)

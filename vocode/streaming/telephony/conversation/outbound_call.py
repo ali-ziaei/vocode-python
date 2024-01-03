@@ -160,6 +160,7 @@ class OutboundCall:
                 twilio_sid=self.telephony_id,
                 from_phone=self.from_phone,
                 to_phone=self.to_phone,
+                direction="outbound",
             )
         elif isinstance(self.telephony_client, VonageClient):
             call_config = VonageCallConfig(
@@ -171,6 +172,7 @@ class OutboundCall:
                 vonage_uuid=self.telephony_id,
                 from_phone=self.from_phone,
                 to_phone=self.to_phone,
+                direction="outbound",
                 output_to_speaker=self.output_to_speaker,
             )
         else:

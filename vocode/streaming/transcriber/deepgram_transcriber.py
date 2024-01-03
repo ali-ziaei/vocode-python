@@ -118,6 +118,10 @@ class DeepgramTranscriber(BaseAsyncTranscriber[DeepgramTranscriberConfig]):
             extra_params["version"] = self.transcriber_config.version
         if self.transcriber_config.keywords:
             extra_params["keywords"] = self.transcriber_config.keywords
+        if self.transcriber_config.diarize:
+            extra_params["diarize"] = "true"
+        if self.transcriber_config.filler_words:
+            extra_params["filler_words"] = "true"
         if self.transcriber_config.smart_format:
             extra_params["smart_format"] = "true"
         else:
@@ -262,7 +266,7 @@ class DeepgramTranscriber(BaseAsyncTranscriber[DeepgramTranscriberConfig]):
                     elif top_choice["transcript"] and confidence > 0.0:
                         self.output_queue.put_nowait(
                             Transcription(
-                                message=buffer,
+                                message=top_choice["transcript"],
                                 confidence=confidence,
                                 is_final=False,
                                 latency=cur_min_latency,

@@ -12,6 +12,7 @@ import time
 import typing
 from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar, cast
 
+import numpy as np
 from vocode.streaming.action.worker import ActionsWorker
 from vocode.streaming.agent.base_agent import (
     AgentInput,
@@ -129,6 +130,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 and current_time
                 - self.conversation.spoken_metadata.customer_last_spoken_end_time
                 > self.conversation.agent_filler_config.ask_more_time.threshold_sec
+                + self.conversation.scaled_ep_wait_time
             ):
                 filler_phrase = random.choice(
                     self.conversation.agent_filler_config.ask_more_time.filler_phrases
@@ -290,6 +292,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 None
             )
 
+        async def _scale_ep_wait_time(self, endpoint_prob):
+            return (
+                2
+                * (1 - (1 / (1 + np.exp(-10 * endpoint_prob))))
+                * self.conversation.agent_endpoint_config.time_out
+            )
+
         async def publish_asr_result(self):
             if not self.conversation.transcriptions_worker.is_speaking_at:
                 return
@@ -304,7 +313,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                 transcription_in_queue = await self._flush_asr_queue()
 
                 # if we pass endpoint time out, we send out final_transcription
-                if wait_time >= self.conversation.agent_endpoint_config.time_out:
+                if wait_time >= self.conversation.scaled_ep_wait_time:
                     await self._send_transcript_event(context)
 
                 if transcription_in_queue is not None:
@@ -331,19 +340,19 @@ class StreamingConversation(Generic[OutputDeviceType]):
                         )
 
                     # model based endpoint pointing
-                    is_endpoint = await self.conversation.agent.get_endpoint_prediction(
+                    endpoint_prob = await self.conversation.agent.get_endpoint_prediction(
                         self.conversation.transcriptions_postprocessing_worker.final_transcription.message,
                         self.conversation.id,
+                    )
+                    self.conversation.scaled_ep_wait_time = (
+                        await self._scale_ep_wait_time(endpoint_prob)
                     )
 
                     log_message = VocodeBaseLogMessage(
                         message="Endpointing: applied end point model ...",
-                        text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}", Endpoint: "{is_endpoint}"',
+                        text=f'Transcription: "{self.conversation.transcriptions_postprocessing_worker.final_transcription.message}", Endpoint probability: "{endpoint_prob}", "New timeout: "{self.conversation.scaled_ep_wait_time}"',
                     )
                     self.conversation.logger.debug(log_message, context=context)
-
-                    if is_endpoint:
-                        await self._send_transcript_event(context)
 
         async def process(self, item: bytes):
             self.output_queue.put_nowait(item)
@@ -652,6 +661,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     (
                         agent_response_message.message,
                         agent_response_message.last_message,
+                        agent_response_message.summary_dict,
                         synthesis_result,
                         agent_response_message.hangs_up,
                     ),
@@ -681,7 +691,13 @@ class StreamingConversation(Generic[OutputDeviceType]):
             item: InterruptibleAgentResponseEvent[Tuple[BaseMessage, SynthesisResult]],
         ):
             try:
-                message, last_message, synthesis_result, hangs_up = item.payload
+                (
+                    message,
+                    last_message,
+                    summary_dict,
+                    synthesis_result,
+                    hangs_up,
+                ) = item.payload
                 if last_message is None:
                     last_message = BaseMessage(text="")
                 # create an empty transcript message and attach it to the transcript
@@ -706,8 +722,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     self.conversation.synthesizer.get_synthesizer_config().text_to_speech_chunk_size_seconds,
                     transcript_message=transcript_message,
                 )
-                if hangs_up:
-                    await self.conversation.terminate()
                 self.conversation.spoken_metadata.agent_last_spoken_end_time = (
                     time.time()
                 )
@@ -725,6 +739,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     text=message_sent,
                 )
                 self.conversation.logger.debug(log_message, context=context)
+
+                message_sent_total = last_message.text + " " + message_sent
+                message_sent_total = " ".join(message_sent_total.split()).strip()
 
                 # terminate call if multiple retry happens
                 if self.conversation.agent_filler_config.ask_more_time:
@@ -776,8 +793,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 await self.conversation.terminate()
 
                 if item.interruption_event.is_set():
-                    message_sent_total = last_message.text + " " + message_sent
-                    message_sent_total = " ".join(message_sent_total.split()).strip()
                     if (
                         len(message_sent_total.split())
                         <= self.conversation.agent_filler_config.agent_interrupt_customer.agent_num_spoken_words_as_interrupt_threshold
@@ -825,9 +840,12 @@ class StreamingConversation(Generic[OutputDeviceType]):
                                 agent_response_event
                             )
 
-                    await self.conversation.agent.update_last_bot_message_on_cut_off(
-                        message_sent_total, conversation_id=self.conversation.id
-                    )
+                await self.conversation.agent.update_agent_response(
+                    message_sent,
+                    last_message.text,
+                    summary_dict,
+                    conversation_id=self.conversation.id,
+                )
 
                 if self.conversation.agent.agent_config.end_conversation_on_goodbye:
                     goodbye_detected_task = (
@@ -843,6 +861,9 @@ class StreamingConversation(Generic[OutputDeviceType]):
                             await self.conversation.terminate()
                     except asyncio.TimeoutError:
                         pass
+                if hangs_up:
+                    await self.conversation.terminate()
+
             except asyncio.CancelledError:
                 pass
 
@@ -875,6 +896,7 @@ class StreamingConversation(Generic[OutputDeviceType]):
 
         self.agent_filler_config = self.agent.get_agent_config().agent_filler_config
         self.agent_endpoint_config = self.agent.get_agent_config().agent_endpoint_config
+        self.scaled_ep_wait_time = self.agent_endpoint_config.time_out
 
         self.num_retry_ask_more_time_in_row = 0
         self.num_retry_speak_up_in_row = 0
@@ -1187,13 +1209,6 @@ class StreamingConversation(Generic[OutputDeviceType]):
                     started_event.set()
             self.output_device.consume_nonblocking(chunk_result.chunk)
             end_time = time.time()
-
-            context = VocodeLogContext(self.id)
-            log_message = VocodeBaseLogMessage(
-                message=f'TTS: Sent chunk "{chunk_idx}" with length (sec): "{speech_length_seconds}" to output device.',
-                text=message_sent,
-            )
-            self.logger.debug(log_message, context=context)
 
             @sentry_probe("TTS speaking", data={"message": message})
             async def _tts_speaking():

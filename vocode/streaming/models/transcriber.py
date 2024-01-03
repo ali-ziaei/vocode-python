@@ -104,12 +104,15 @@ class TranscriberConfig(TypedModel, type=TranscriberType.BASE.value):
 
 
 class DeepgramTranscriberConfig(TranscriberConfig, type=TranscriberType.DEEPGRAM.value):
+    speech_key: Optional[str] = None
     language: Optional[str] = None
     model: Optional[str] = "nova"
     tier: Optional[str] = None
     version: Optional[str] = None
     keywords: Optional[list] = None
     smart_format: Optional[bool] = None
+    diarize: Optional[bool] = None
+    filler_words: Optional[bool] = None
 
 
 class GladiaTranscriberConfig(TranscriberConfig, type=TranscriberType.GLADIA.value):

@@ -107,6 +107,7 @@ class BaseCallConfig(TypedModel, type=CallConfigType.BASE.value):
     synthesizer_config: SynthesizerConfig
     from_phone: str
     to_phone: str
+    direction: str
 
     @staticmethod
     def default_audio_service_config():

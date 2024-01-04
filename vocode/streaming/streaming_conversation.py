@@ -47,6 +47,7 @@ from vocode.streaming.synthesizer.base_synthesizer import (
     FillerAudio,
     SynthesisResult,
 )
+from vocode.streaming.telephony.config_manager.redis_config_manager import RedisConfigManager
 from vocode.streaming.transcriber.base_transcriber import BaseTranscriber, Transcription
 from vocode.streaming.utils import create_conversation_id, get_chunk_size_per_second
 from vocode.streaming.utils.events_manager import EventsManager
@@ -1073,6 +1074,11 @@ class StreamingConversation(Generic[OutputDeviceType]):
         await initial_message_tracker.wait()
         self.audio_service.unmute()
         self.transcriber.unmute()
+        agent_config = self.agent.get_agent_config()
+        # TODO: this should not assume we're using RedisConfigManager
+        call_config = await RedisConfigManager().get_config(self.id)
+        if agent_config.hangup_on_inbound and call_config.direction == "inbound":
+            await self.terminate()
 
     async def check_for_idle(self):
         """Terminates the conversation after 15 seconds if no activity is detected"""
